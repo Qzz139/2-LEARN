@@ -1,0 +1,49 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: world
+    Background Color: 38; 43; 51
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 20
+    - Class: rviz_default_plugins/RobotModel
+      Name: EP robot
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: moveit_rviz_plugin/MotionPlanning
+      Name: MotionPlanning
+      Enabled: true
+      Robot Description: robot_description
+      Planning Scene Topic: /monitored_planning_scene
+      Planning Request:
+        Planning Group: arm
+        Interactive Marker Size: 0.08
+        Query Start State: false
+        Query Goal State: false
+      Planned Path:
+        Trajectory Topic: /display_planned_path
+        Loop Animation: false
+        State Display Time: 0.05 s
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 0.85
+      Focal Point: {X: 0.14, Y: 0.0, Z: 0.15}
+      Pitch: 0.4
+      Yaw: 4.2
+Window Geometry:
+  Width: 1100
+  Height: 800

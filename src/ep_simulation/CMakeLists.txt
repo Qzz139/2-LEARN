@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.5)
+project(ep_simulation)
+find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
+ament_python_install_package(ep_simulation)
+install(PROGRAMS scripts/pick_demo.py scripts/joint_states.py DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+ament_package()

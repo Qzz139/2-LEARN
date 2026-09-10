@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.5)
+project(robomaster_description)
+find_package(ament_cmake REQUIRED)
+install(DIRECTORY urdf launch meshes DESTINATION share/${PROJECT_NAME})
+install(FILES LICENSE DESTINATION share/${PROJECT_NAME})
+ament_package()

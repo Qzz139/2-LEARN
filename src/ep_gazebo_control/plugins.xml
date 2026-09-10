@@ -1,0 +1,6 @@
+<library path="ep_position_servo">
+  <class name="ep_gazebo_control/PositionServo" type="ep_gazebo_control::PositionServo"
+    base_class_type="gazebo_ros2_control::GazeboSystemInterface">
+    <description>Position targets tracked with bounded ODE velocity motors, retaining physical contacts.</description>
+  </class>
+</library>

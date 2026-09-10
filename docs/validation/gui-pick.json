@@ -1,0 +1,114 @@
+{
+  "success": true,
+  "lift_m": 0.045172801930417755,
+  "return_error_m": 0.0003808235457421874,
+  "events": [
+    {
+      "stage": "gripper",
+      "wall_time": 1789009211.9474273,
+      "commanded_half_gap": 0.04
+    },
+    {
+      "stage": "home",
+      "wall_time": 1789009218.0605435,
+      "joints": [
+        0.34916190501295663,
+        -0.34962367715990617
+      ],
+      "trajectory_points": 37
+    },
+    {
+      "stage": "approach",
+      "wall_time": 1789009225.5647762,
+      "joints": [
+        0.7991432966988832,
+        -0.600116323833273
+      ],
+      "trajectory_points": 45
+    },
+    {
+      "stage": "cube_initial",
+      "wall_time": 1789009225.56773,
+      "position": [
+        0.2900306731569156,
+        -0.0009410000000008563,
+        0.1370464828965712
+      ]
+    },
+    {
+      "stage": "pick",
+      "wall_time": 1789009230.9135127,
+      "joints": [
+        1.099521283269616,
+        -0.7003648742147117
+      ],
+      "trajectory_points": 33
+    },
+    {
+      "stage": "gripper",
+      "wall_time": 1789009234.8707151,
+      "commanded_half_gap": 0.011
+    },
+    {
+      "stage": "lift",
+      "wall_time": 1789009241.3405814,
+      "joints": [
+        0.8009472288689796,
+        -0.6005534453844756
+      ],
+      "trajectory_points": 33
+    },
+    {
+      "stage": "cube_lifted",
+      "wall_time": 1789009242.3438706,
+      "position": [
+        0.28589104039761554,
+        -0.001153128350623594,
+        0.18221928482698896
+      ],
+      "lift_m": 0.045172801930417755
+    },
+    {
+      "stage": "replace",
+      "wall_time": 1789009248.5704453,
+      "joints": [
+        1.0999929945687041,
+        -0.6991931197075063
+      ],
+      "trajectory_points": 33
+    },
+    {
+      "stage": "gripper",
+      "wall_time": 1789009252.4985192,
+      "commanded_half_gap": 0.04
+    },
+    {
+      "stage": "retract",
+      "wall_time": 1789009257.8431525,
+      "joints": [
+        0.800973048150162,
+        -0.6009080282477877
+      ],
+      "trajectory_points": 33
+    },
+    {
+      "stage": "home_final",
+      "wall_time": 1789009265.2394333,
+      "joints": [
+        0.35082311676184297,
+        -0.3500360287497397
+      ],
+      "trajectory_points": 45
+    },
+    {
+      "stage": "cube_final",
+      "wall_time": 1789009266.2513833,
+      "position": [
+        0.2899556783551357,
+        -0.0005676337552790776,
+        0.1370464828965712
+      ],
+      "return_error_m": 0.0003808235457421874
+    }
+  ]
+}
