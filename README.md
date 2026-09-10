@@ -74,3 +74,7 @@ python3 -m unittest discover -s tests -v
 ```
 
 通过 Mac SSH 下载 GitHub 仓库再同步到 Jetson 时，不要把 `build/`、`install/` 和 `work/` 跨机复制；代码同步后在 Jetson 上构建。提交应包含源码、许可证和必要验证摘要，不包含构建缓存和大体积日志。
+
+## 课程任务要求
+<img width="590" height="766" alt="image" src="https://github.com/user-attachments/assets/9053b3c5-37d4-46f7-9a4b-58b216af0e4b" />
+
