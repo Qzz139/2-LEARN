@@ -24,6 +24,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['start', 'stop', 'status'])
     parser.add_argument('--headless', action='store_true')
+    parser.add_argument('--run-task', action='store_true')
+    parser.add_argument('--cycles', type=int, default=1)
     parser.add_argument('--display', default=os.environ.get('DISPLAY', ':2'))
     args = parser.parse_args()
     previous = json.loads(state.read_text()) if state.exists() else None
@@ -55,7 +57,9 @@ def main():
     with log.open('w') as handle:
         p = subprocess.Popen(['bash', str(root/'scripts/run_sim.sh'),
               'gui:='+str(not args.headless).lower(),
-              'rviz:='+str(not args.headless).lower()],
+              'rviz:='+str(not args.headless).lower(),
+              'run_task:='+str(args.run_task).lower(), 'cycles:='+str(args.cycles),
+              'result_file:=work/bottle-five.json' if args.cycles == 5 else 'result_file:=work/pick_result.json'],
               cwd=root, env=env, stdout=handle, stderr=subprocess.STDOUT,
               start_new_session=True)
     state.write_text(json.dumps({'pid': p.pid, 'log': str(log), 'display': args.display}))

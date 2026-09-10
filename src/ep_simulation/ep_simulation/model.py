@@ -9,6 +9,8 @@ import xml.etree.ElementTree as ET
 
 ARM_JOINTS = ['arm_1_joint', 'arm_2_joint']
 HOME = [0.35, -0.35]
+BASE_HEIGHT = 0.0  # Upstream wheel centers are 0.05 m above base_link.
+TOOL_OFFSET = (0.1056754, -0.000941, 0.1172202)
 
 
 def element(parent, tag, **attrs):
@@ -94,7 +96,7 @@ def adapt(xml, controllers):
     rod1.find('origin').set('rpy', '0 0 0')
     rod1.find('mimic').set('joint', 'arm_2_joint')
     element(root, 'link', name='world')
-    joint(root, 'world_fixed', 'world', 'base_link', kind='fixed', xyz='0 0 0.06')
+    joint(root, 'world_fixed', 'world', 'base_link', kind='fixed', xyz='0 0 '+str(BASE_HEIGHT))
     inertial(element(root, 'link', name='tool_link'))
     joint(root, 'tool_fixed', 'gripper_link', 'tool_link', kind='fixed', xyz='0.095 0 -0.039')
     for side, sign in [('left', 1), ('right', -1)]:
@@ -102,7 +104,7 @@ def adapt(xml, controllers):
         inertial(link, mass=0.025, diagonal=1e-5)
         for tag in ['visual', 'collision']:
             item = element(link, tag)
-            element(element(item, 'geometry'), 'box', size='0.05 0.01 0.02')
+            element(element(item, 'geometry'), 'box', size='0.05 0.01 0.05')
             if tag == 'visual':
                 element(element(item, 'material', name='finger_dark'), 'color', rgba='0.12 0.14 0.16 1')
         j = joint(root, side+'_finger_joint', 'tool_link', side+'_finger',
@@ -133,13 +135,17 @@ def adapt(xml, controllers):
             element(element(c, 'geometry'), 'box', size=size)
     # Upstream tiny-link inertias are visualization values, not calibrated dynamics.
     # Use conservative positive diagonal approximations and disable gravity on
-    # the arm's constrained tree; the world/cube retain gravity and collisions.
+    # the arm's constrained tree; the world/bottle retain gravity and collisions.
     for link in root.findall('link'):
         if link.get('name') == 'world':
             continue
         if link.find('inertial') is None:
             inertial(link)
         i = link.find('inertial/inertia')
+        if link.get('name') in ['wrist_counter_link', 'rod_counter_link', 'rod1_counter_link']:
+            # Finite virtual-rotor inertia avoids near-singular coaxial ODE motors.
+            # This is numerical regularization, not a measured EP rotor mass.
+            link.find('inertial/mass').set('value', '0.05')
         mass = float(link.find('inertial/mass').get('value'))
         for k in ['ixx', 'iyy', 'izz']:
             i.set(k, str(max(1e-7, mass*0.002)))
@@ -187,10 +193,30 @@ def fk(q):
     x2, z2 = ry(0.1058557, -0.0561093, a+b)
     return [0.0103961+x1+x2+0.0002793+0.095,
             0.0010384-0.0255713+0.0438659+0.006752-0.027026,
-            0.06+0.03465+0.0906477+0.030741+z1+z2+0.0001815-0.039]
+            BASE_HEIGHT+0.03465+0.0906477+0.030741+z1+z2+0.0001815-0.039]
 
 
 def valid(q):
     a, b = q
     return (-0.274 <= a <= 1.384 and -1.21475 <= b <= 0.34732
             and -0.79936 <= a+b <= 1.73137)
+
+
+def ik(x, z):
+    """Planar position IK for this pinned geometry; reject unreachable targets."""
+    if not all(math.isfinite(v) for v in [x, z]):
+        raise ValueError('Target coordinates must be finite')
+    u, v = x-TOOL_OFFSET[0], z-TOOL_OFFSET[2]-BASE_HEIGHT
+    l1, l2 = math.hypot(0.0018704, 0.1210238), math.hypot(0.1058557, -0.0561093)
+    p1, p2 = math.atan2(0.1210238, 0.0018704), math.atan2(-0.0561093, 0.1058557)
+    cosine = (u*u+v*v-l1*l1-l2*l2)/(2*l1*l2)
+    if abs(cosine) > 1+1e-10:
+        raise ValueError('Target lies outside the planar arm reach')
+    for delta in [-math.acos(max(-1, min(1, cosine))), math.acos(max(-1, min(1, cosine)))]:
+        a = p1-math.atan2(v, u)+math.atan2(l2*math.sin(delta), l1+l2*math.cos(delta))
+        b = p2-p1-delta
+        a = (a+math.pi) % (2*math.pi)-math.pi
+        b = (b+math.pi) % (2*math.pi)-math.pi
+        if valid([a, b]):
+            return [a, b]
+    raise ValueError('Target violates EP joint or coupled motor limits')

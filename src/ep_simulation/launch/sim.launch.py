@@ -1,4 +1,3 @@
-import os
 import tempfile
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ep_simulation.model import adapt
-from ep_simulation.scene import semantic, world_sdf
+from ep_simulation.scene import semantic, world_sdf, load_config
 
 
 def setup(context):
@@ -25,7 +24,9 @@ def setup(context):
     srdf = semantic(urdf)
     (runtime/'robot.urdf').write_text(urdf)
     (runtime/'robot.srdf').write_text(srdf)
-    (runtime/'pick.world').write_text(world_sdf())
+    config_path = LaunchConfiguration('bottle_config').perform(context)
+    cfg = load_config(config_path or sim/'config/bottle.json')
+    (runtime/'pick.world').write_text(world_sdf(cfg))
     params = {'robot_description': urdf, 'robot_description_semantic': srdf,
               'use_sim_time': True,
               'planning_pipelines': ['ompl'], 'default_planning_pipeline': 'ompl',
@@ -69,11 +70,21 @@ def setup(context):
         actions.append(TimerAction(period=10.0, actions=[Node(package='rviz2', executable='rviz2',
             arguments=['-d', str(moveit/'config/ep.rviz')], parameters=[params], output='screen',
             remappings=[('/joint_states', '/ep_joint_states')])]))
+    if LaunchConfiguration('run_task').perform(context).lower() == 'true':
+        actions.append(TimerAction(period=15.0, actions=[Node(package='ep_simulation',
+            executable='pick_demo.py', output='screen', arguments=[
+                '--config', str(config_path or sim/'config/bottle.json'),
+                '--cycles', LaunchConfiguration('cycles').perform(context),
+                '--output', LaunchConfiguration('result_file').perform(context)])]))
     print('EP runtime files:', runtime, flush=True)
     return actions
 
 
 def generate_launch_description():
     return LaunchDescription([
+        DeclareLaunchArgument('run_task', default_value='false'),
+        DeclareLaunchArgument('cycles', default_value='1'),
+        DeclareLaunchArgument('result_file', default_value='work/pick_result.json'),
+        DeclareLaunchArgument('bottle_config', default_value=''),
         DeclareLaunchArgument('gui', default_value='true'),
         DeclareLaunchArgument('rviz', default_value='true'), OpaqueFunction(function=setup)])

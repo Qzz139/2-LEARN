@@ -1,0 +1,42 @@
+{
+  "unreachable": {
+    "return_code": 1,
+    "result": {
+      "success": false,
+      "error": "Target lies outside the planar arm reach",
+      "runs": [],
+      "resets": [],
+      "events": []
+    }
+  },
+  "joint_limit": {
+    "return_code": 1,
+    "result": {
+      "success": false,
+      "error": "Target violates EP joint or coupled motor limits",
+      "runs": [],
+      "resets": [],
+      "events": []
+    }
+  },
+  "nonfinite": {
+    "return_code": 1,
+    "result": {
+      "success": false,
+      "error": "Bottle settings must contain finite numeric values",
+      "runs": [],
+      "resets": [],
+      "events": []
+    }
+  },
+  "gripper_limit": {
+    "return_code": 1,
+    "result": {
+      "success": false,
+      "error": "Bottle must fit inside the opened 100 mm gripper",
+      "runs": [],
+      "resets": [],
+      "events": []
+    }
+  }
+}

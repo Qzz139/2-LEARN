@@ -4,21 +4,43 @@ from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
 
-from ep_simulation.model import adapt, fk, valid
-from ep_simulation.scene import semantic, CUBE_START, TABLE_HEIGHT, PICK, LIFT
+from ep_simulation.model import adapt, fk, ik, valid
+from ep_simulation.scene import semantic, load_config, targets, bottle_start, bottle_goal, bottle_mass, world_sdf
+CONFIG = Path(__file__).resolve().parents[1]/"src/ep_simulation/config/bottle.json"
 
 
 class WorkspaceTests(unittest.TestCase):
     def test_demo_targets_inside_motor_limits(self):
-        for q in [PICK, LIFT, [0.35, -0.35]]:
+        for q in list(targets(load_config(CONFIG)).values()) + [[0.35, -0.35]]:
             self.assertTrue(valid(q))
         self.assertFalse(valid([-0.274, -1.21475]))  # both individual limits pass; coupled motor fails
         self.assertFalse(valid([0.0, 0.4]))
 
-    def test_scene_clearance_and_lift(self):
-        self.assertAlmostEqual(CUBE_START[2]-TABLE_HEIGHT, 0.0125)
-        self.assertGreater(fk(LIFT)[2]-fk(PICK)[2], 0.04)
-        self.assertAlmostEqual(fk(LIFT)[1], fk(PICK)[1])
+    def test_floor_scene_and_clearance(self):
+        cfg = load_config(CONFIG); qs = targets(cfg)
+        self.assertAlmostEqual(bottle_start(cfg)[2], cfg['height_m']/2)
+        self.assertAlmostEqual(fk(qs['lift'])[2]-fk(qs['pick'])[2], cfg['lift_height_m'])
+        self.assertGreater(abs(bottle_start(cfg)[0]-bottle_goal(cfg)[0]), 0.04)
+        root = ET.fromstring(world_sdf(cfg)); models = {m.get('name'):m for m in root.findall('world/model')}
+        self.assertNotIn('pick_pedestal', models)
+        # Avoid the closed jaw intersecting the bottle when the robot is spawned.
+        self.assertGreater(cfg['pick_x_m']-cfg['diameter_m']/2-(fk([0,0])[0]+0.025), 0.003)
+        self.assertIsNone(models['place_marker'].find('link/collision'))
+        self.assertAlmostEqual(float(models['target_bottle'].find('link/inertial/mass').text), bottle_mass(cfg))
+
+    def test_ik_roundtrip(self):
+        for a in [0.0, 0.5, 0.9, 1.3]:
+            for b in [-1.0, -0.6, 0.0]:
+                if valid([a,b]):
+                    xyz = fk([a,b]); reconstructed = fk(ik(xyz[0], xyz[2]))
+                    for v,w in zip(xyz, reconstructed): self.assertAlmostEqual(v, w, places=8)
+
+    def test_unreachable_and_nonfinite_targets_rejected(self):
+        for x,z in [(1.0, 0.1), (float('nan'), 0.1), (0.1056754, 0.1172202)]:
+            with self.assertRaises(ValueError): ik(x,z)
+        xyz = fk([-0.4, 0.0])
+        with self.assertRaises(ValueError): ik(xyz[0],xyz[2])
+
 
 
 class URDFTests(unittest.TestCase):

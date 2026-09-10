@@ -1,27 +1,29 @@
-# RoboMaster EP 固定底盘定点抓取仿真
+# RoboMaster EP 地面瓶子定点取放仿真
 
-在 Jetson Orin 上运行 Gazebo 11 + ROS 2 Foxy + MoveIt 2。底盘固定，只控制两轴机械臂和夹爪，执行接近、抓取、抬升、放回和回位。
+在 Jetson Orin 上运行 Gazebo 11 + ROS 2 Foxy + MoveIt 2。底盘固定于地面，使用两轴机械臂夹取竖直瓶子，从固定 A 点移动到地面 B 点并释放。场景中没有台座。
 
-模型复用 `jeguzzi/robomaster_ros`；夹爪接触面、惯性和动力学做了简化。详见 [模型来源与边界](docs/model.md) 和 [验证记录](docs/validation.md)。
+复用 `jeguzzi/robomaster_ros` 的 EP 网格与 Xacro，保留上游 MIT 许可证。瓶子是近似 550 ml 瓶型的刚体代理；尺寸、空瓶质量、装水量和摩擦均可配置。**不能用仿真结果推断 PET 瓶不变形或满瓶在实机上可抓取。**
+
+课程原文要求桌面；地面版本是用户指定的场景调整，需确认教师接受。详见 [课程要求与覆盖范围](docs/course-requirements.md)、[模型边界](docs/model.md)、[地面瓶子验证](docs/bottle-validation.md) 和 [真机准备方案](docs/real-control-plan.md)。
 
 ## 项目结构
 
 ```text
 src/
-  robomaster_description/  上游 EP 网格、Xacro 和许可证
-  ep_gazebo_control/       有界 Gazebo 电机驱动，兼容标准轨迹控制器
-  ep_simulation/           模型适配、场景、启动文件及自动抓取
+  robomaster_description/  复用的上游 EP 网格、Xacro、许可证
+  ep_gazebo_control/       仿真电机驱动，兼容标准关节轨迹 Action
+  ep_simulation/           模型、平面逆解、瓶子配置、场景、任务与 Launch
   ep_moveit_config/        MoveIt/OMPL、控制器和 RViz 配置
-scripts/                  构建、运行和会话管理入口
-tests/                    模型拓扑、联动与运动学测试
-docs/                     来源、简化说明与实测记录
-work/                     本机运行日志和实验结果，不提交 Git
-build/ install/ log/       colcon 生成文件，不提交 Git
+scripts/                  构建、运行、停止入口
+tests/                    拓扑、运动学、可达性和场景测试
+docs/                     课程要求、来源、验证数据、真机计划
+work/                     日志和轨迹结果（不提交 Git）
+build/ install/ log/       colcon 缓存（不提交 Git）
 ```
 
 ## 安装与构建
 
-在 Ubuntu 20.04 / ROS 2 Foxy 环境运行；Gazebo 11 应已安装。
+Ubuntu 20.04 / ROS 2 Foxy，Gazebo 11 已安装：
 
 ```bash
 sudo apt-get install -y --no-remove \
@@ -33,39 +35,51 @@ sudo apt-get install -y --no-remove \
 bash scripts/build.sh
 ```
 
-## 在 SSH/VNC 中运行
+## 一条 Launch 启动完整系统与任务
 
-当前 Jetson 项目目录为 `/home/robot/projects/2-LEARN`，VNC 桌面为 `:2`。
+在 Jetson 上运行，确认本项目没有另一会话占用仿真端口：
 
 ```bash
 cd /home/robot/projects/2-LEARN
+export DISPLAY=:2
+export XAUTHORITY=/home/robot/.Xauthority
+bash scripts/run_sim.sh run_task:=true cycles:=1
+```
+
+底层为同一个 `ep_simulation sim.launch.py`，启动 Gazebo、MoveIt、控制器、状态节点、RViz 和任务节点。`gui:=false rviz:=false` 可关闭可视化；`cycles:=5` 执行五次验收。后台自动验收可用 `python3 scripts/session.py start --headless --run-task --cycles 5`，结果为 `work/bottle-five.json`。结束后 Ctrl+C 关闭系统。
+
+后台会话和手动触发：
+
+```bash
 python3 scripts/session.py start --display :2
-```
-
-VNC 中会出现 Gazebo 和 RViz。等待模型、控制器加载后执行：
-
-```bash
-bash scripts/pick.sh
-```
-
-结果写入 `work/pick_result.json`。成功必须同时满足物块实际抬升至少 25 mm、放回误差小于 12 mm；失败返回非零退出码。
-
-```bash
+bash scripts/pick.sh --cycles 1 --output work/bottle-result.json
 python3 scripts/session.py status
 python3 scripts/session.py stop
 ```
 
-无界面运行使用 `python3 scripts/session.py start --headless`。前台运行可用 `bash scripts/run_sim.sh gui:=true rviz:=true`，用 Ctrl+C 停止。重复实验可以先停止再启动以恢复初始场景；如果物块已偏离抓取点，脚本会明确失败，不会自动把物块瞬移回去。
+连续验收使用 `bash scripts/pick.sh --cycles 5 --output work/bottle-five.json`。同一仿真世界中执行五次 A→B；两轮之间机械臂实际把瓶子 B→A 搬回，这四次复位单独记录，不计入五次成绩，没有物体瞬移或重启世界。任务失败即停止后续动作，不为了凑次数继续盲抓。
 
-仿真默认使用 `ROS_DOMAIN_ID=187`、本机 ROS 通信和 Gazebo 端口 `11355`。所有脚本保持同一环境，不要在同一终端混合 source ROS 1 Noetic。模型驱动不连接真实 EP。
+## 修改瓶子与 A/B
 
-## 调整抓取点
+`src/ep_simulation/config/bottle.json` 是共同配置源：
 
-`src/ep_simulation/ep_simulation/scene.py` 集中定义 `PICK`、`LIFT`、物块和台座。目标使用弧度制关节坐标；`model.fk()` 可计算工具中心的世界坐标。修改场景后重启仿真。
+- 近似瓶高 227 mm、直径 64 mm；需要测量实物批次后更新。
+- 默认空瓶假设 25 g、装水 150 ml，总重 175 g；150 ml 不是避免形变的保证。
+- A 点 x=275 mm，B 点 x=320 mm，y 固定在机械臂平面内。
+- 在瓶身离地 105 mm 处夹持，抬升 50 mm；放置时根据观测到的夹持滑移修正高度，使瓶底留约 2 mm 松爪间隙后落地。
+- `open_half_gap_m` 是单侧半开口，不是总开口。
 
-`ep_moveit_config/config/` 中设置规划限速；`ep_simulation/config/controllers.yaml` 设置轨迹控制器。RViz 可查看机器人和规划轨迹，当前流程不依赖六自由度末端拖拽 IK。
+配置使用 world 坐标和米。`model.ik(x,z)` 转成两独立关节角，启动前检查可达性/耦合限位；每条 MoveIt 轨迹再检查全部路点。固定底盘不能横向移动瓶子。
 
-## 验证
+修改默认配置后重启仿真。另用配置文件时，Launch 的 `bottle_config:=/绝对路径/bottle.json` 与手动任务的 `--config /绝对路径/bottle.json` 必须一致；用 `run_task:=true` 自动共享配置。
+
+## 输出与限制
+
+`work/pick_result.json` 保存配置、每次成绩、复位成绩、实际瓶子位置/倾角、轨迹关节位置/速度/加速度/时间以及错误；会话日志在 `work/sim.log`。单次验收需要实际抬升 ≥25 mm，B 点误差 ≤12 mm，瓶子倾角 ≤10°，一秒稳定性采样漂移 ≤3 mm。运行失败返回非零退出码。
+
+MoveIt 中携带瓶子碰撞体；Gazebo 中依靠夹爪接触摩擦，未用固定吸附。机器人惯性、联动、夹爪仍为简化代理，不能代替完整动力学/损伤验证。真机接口尚未实施。
+
+ROS 默认域为 187，仅本机通信，Gazebo 端口 11355；不连接真实 EP。不在同一终端混合 source ROS 1 Noetic。
 
 ```bash
 source /opt/ros/foxy/setup.bash
@@ -73,8 +87,9 @@ source install/setup.bash
 python3 -m unittest discover -s tests -v
 ```
 
-通过 Mac SSH 下载 GitHub 仓库再同步到 Jetson 时，不要把 `build/`、`install/` 和 `work/` 跨机复制；代码同步后在 Jetson 上构建。提交应包含源码、许可证和必要验证摘要，不包含构建缓存和大体积日志。
+旧台座方块验证保留于 `docs/validation.md`，仅代表旧版本结果。
 
 ## 课程任务要求
 <img width="590" height="766" alt="image" src="https://github.com/user-attachments/assets/9053b3c5-37d4-46f7-9a4b-58b216af0e4b" />
 
+文字转录及范围说明见 [课程要求](docs/course-requirements.md)。

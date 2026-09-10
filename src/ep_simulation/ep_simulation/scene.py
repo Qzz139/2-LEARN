@@ -1,36 +1,82 @@
-"""Deterministic tabletop scene and MoveIt semantic description."""
+"""Upright bottle on the floor; all task dimensions are in meters."""
 import itertools
+import json
+import math
+from pathlib import Path
 import xml.etree.ElementTree as ET
-from .model import fk
-
-PICK = [1.1, -0.7]
-LIFT = [0.8, -0.6]
-CUBE_SIZE = 0.025
-CUBE_START = fk(PICK)
-TABLE_HEIGHT = CUBE_START[2] - CUBE_SIZE/2
+from .model import fk, ik, TOOL_OFFSET
 
 
-def world_sdf():
-    x, y, z = CUBE_START
-    h = TABLE_HEIGHT
+def load_config(path=None):
+    if path is None:
+        from ament_index_python.packages import get_package_share_directory
+        path = Path(get_package_share_directory('ep_simulation'))/'config/bottle.json'
+    cfg = json.loads(Path(path).read_text())
+    numeric = ['height_m', 'diameter_m', 'empty_mass_kg', 'water_ml', 'friction',
+               'pick_x_m', 'place_x_m', 'grasp_height_m', 'lift_height_m',
+               'release_clearance_m', 'open_half_gap_m', 'grip_compression_m']
+    if not all(isinstance(cfg.get(k), (int, float)) and math.isfinite(cfg[k]) for k in numeric):
+        raise ValueError('Bottle settings must contain finite numeric values')
+    if not (0 < cfg['height_m'] < 0.4 and 0 < cfg['diameter_m'] < 0.1
+            and 0 < cfg['empty_mass_kg'] and 0 <= cfg['water_ml'] <= 550
+            and 0 < cfg['friction'] <= 2 and 0 < cfg['lift_height_m']
+            and 0 < cfg['release_clearance_m'] <= 0.01
+            and 0 < cfg['grip_compression_m'] < cfg['diameter_m']/2):
+        raise ValueError('Invalid bottle dimensions, mass, friction or clearance')
+    if not cfg['diameter_m']/2+0.003 < cfg['open_half_gap_m'] <= 0.05:
+        raise ValueError('Bottle must fit inside the opened 100 mm gripper')
+    if not 0.03 < cfg['grasp_height_m'] < cfg['height_m']-0.03:
+        raise ValueError('Grasp must be on the bottle body above the ground')
+    targets(cfg)  # Fail before starting Gazebo if any endpoint is unreachable.
+    return cfg
+
+
+def targets(cfg):
+    x, z, lift = cfg['pick_x_m'], cfg['grasp_height_m'], cfg['lift_height_m']
+    px, pz = cfg['place_x_m'], z+cfg['release_clearance_m']
+    return {'pick': ik(x, z), 'approach': ik(x, z+lift),
+            'lift': ik(x, z+lift), 'transfer': ik(px, z+lift),
+            'place': ik(px, pz), 'retract': ik(px, z+lift)}
+
+
+def bottle_start(cfg):
+    return [cfg['pick_x_m'], TOOL_OFFSET[1], cfg['height_m']/2]
+
+
+def bottle_goal(cfg):
+    return [cfg['place_x_m'], TOOL_OFFSET[1], cfg['height_m']/2]
+
+
+def bottle_mass(cfg):
+    return cfg['empty_mass_kg']+cfg['water_ml']/1000
+
+
+def world_sdf(cfg):
+    x, y, z = bottle_start(cfg)
+    h, r, mass, mu = cfg['height_m'], cfg['diameter_m']/2, bottle_mass(cfg), cfg['friction']
+    ixx, izz = mass*(3*r*r+h*h)/12, mass*r*r/2
+    # Rigid cylinder collision/inertia proxy; colored sleeve, shoulder and cap
+    # are visual approximations, not official CAD or a fluid simulation.
     return f'''<sdf version="1.6"><world name="ep_pick_world">
       <gravity>0 0 -9.81</gravity>
       <physics name="ode" type="ode"><max_step_size>0.001</max_step_size><real_time_update_rate>1000</real_time_update_rate><ode><solver><iters>100</iters></solver></ode></physics>
       <scene><ambient>0.65 0.65 0.65 1</ambient><background>0.82 0.86 0.91 1</background><shadows>true</shadows></scene>
       <light name="sun" type="directional"><pose>0 0 2 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><direction>-0.3 0.1 -1</direction></light>
-      <gui><camera name="user_camera"><pose>0.9 -0.8 0.65 0 0.48 2.35</pose></camera></gui>
+      <gui><camera name="user_camera"><pose>0.9 -0.8 0.6 0 0.43 2.35</pose></camera></gui>
       <model name="ground"><static>true</static><link name="link">
         <collision name="collision"><geometry><plane><normal>0 0 1</normal><size>4 4</size></plane></geometry></collision>
         <visual name="visual"><geometry><plane><normal>0 0 1</normal><size>4 4</size></plane></geometry><material><ambient>0.65 0.69 0.73 1</ambient></material></visual>
       </link></model>
-      <model name="pick_pedestal"><static>true</static><pose>0.305 {y} {h/2} 0 0 0</pose><link name="link">
-        <collision name="collision"><geometry><box><size>0.08 0.12 {h}</size></box></geometry></collision>
-        <visual name="visual"><geometry><box><size>0.08 0.12 {h}</size></box></geometry><material><ambient>0.22 0.35 0.48 1</ambient></material></visual>
+      <model name="place_marker"><static>true</static><pose>{cfg['place_x_m']} {y} 0.0002 0 0 0</pose><link name="link">
+        <visual name="visual"><geometry><cylinder><radius>{r+0.008}</radius><length>0.0002</length></cylinder></geometry><material><ambient>0.1 0.65 0.3 0.6</ambient></material><cast_shadows>false</cast_shadows></visual>
       </link></model>
-      <model name="target_cube"><pose>{x} {y} {z+0.0001} 0 0 0</pose><link name="link">
-        <inertial><mass>0.02</mass><inertia><ixx>0.0000020833</ixx><iyy>0.0000020833</iyy><izz>0.0000020833</izz></inertia></inertial>
-        <collision name="collision"><geometry><box><size>0.025 0.025 0.025</size></box></geometry><surface><friction><ode><mu>2</mu><mu2>2</mu2></ode></friction><contact><ode><kp>100000</kp><kd>10</kd><min_depth>0.0005</min_depth><max_vel>0.05</max_vel></ode></contact></surface></collision>
-        <visual name="visual"><geometry><box><size>0.025 0.025 0.025</size></box></geometry><material><ambient>0.95 0.28 0.06 1</ambient><diffuse>0.95 0.28 0.06 1</diffuse></material></visual>
+      <model name="target_bottle"><pose>{x} {y} {z+0.0001} 0 0 0</pose><link name="link">
+        <inertial><mass>{mass}</mass><inertia><ixx>{ixx}</ixx><iyy>{ixx}</iyy><izz>{izz}</izz></inertia></inertial>
+        <collision name="collision"><geometry><cylinder><radius>{r}</radius><length>{h}</length></cylinder></geometry><surface><friction><ode><mu>{mu}</mu><mu2>{mu}</mu2></ode></friction><contact><ode><kp>100000</kp><kd>10</kd><min_depth>0.0005</min_depth><max_vel>0.05</max_vel></ode></contact></surface></collision>
+        <visual name="body"><pose>0 0 {-h*0.08} 0 0 0</pose><geometry><cylinder><radius>{r}</radius><length>{h*0.84}</length></cylinder></geometry><material><ambient>0.65 0.85 0.92 1</ambient><diffuse>0.65 0.85 0.92 1</diffuse></material></visual>
+        <visual name="shoulder"><pose>0 0 {h*0.34} 0 0 0</pose><geometry><sphere><radius>{r}</radius></sphere></geometry><material><ambient>0.65 0.85 0.92 1</ambient></material></visual>
+        <visual name="cap"><pose>0 0 {h*0.47} 0 0 0</pose><geometry><cylinder><radius>{r*0.5}</radius><length>{h*0.06}</length></cylinder></geometry><material><ambient>0.85 0.05 0.03 1</ambient></material></visual>
+        <visual name="label"><pose>0 0 {-h*0.07} 0 0 0</pose><geometry><cylinder><radius>{r+0.0002}</radius><length>{h*0.27}</length></cylinder></geometry><material><ambient>0.85 0.06 0.04 1</ambient></material></visual>
       </link></model>
       <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so"><ros><namespace>/gazebo</namespace></ros><update_rate>30</update_rate></plugin>
     </world></sdf>'''

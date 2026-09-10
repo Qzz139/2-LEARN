@@ -1,0 +1,15 @@
+{
+  "description": "Approximate upright 550 ml bottle; dimensions and mass require measurement",
+  "height_m": 0.227,
+  "diameter_m": 0.064,
+  "empty_mass_kg": 0.025,
+  "water_ml": 150.0,
+  "friction": 1.0,
+  "pick_x_m": 0.275,
+  "place_x_m": 0.320,
+  "grasp_height_m": 0.105,
+  "lift_height_m": 0.050,
+  "release_clearance_m": 0.002,
+  "open_half_gap_m": 0.045,
+  "grip_compression_m": 0.002
+}
