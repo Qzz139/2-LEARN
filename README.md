@@ -75,6 +75,8 @@ python3 scripts/session.py stop
 
 ## 输出与限制
 
+[下载仿真演示视频](docs/videos/ground-bottle-demo.mp4)：2026-09-10 录制的一次完整 A→B 取放，包含回零、抓取、抬升、搬运、释放和返回。对应 [轨迹与执行结果](docs/validation/bottle/recorded-demo.json)。视频为原速桌面录制，Gazebo 渲染帧率较低，画面存在卡顿；详细说明见 [视频说明](docs/videos/README.md)。
+
 `work/pick_result.json` 保存配置、每次成绩、复位成绩、实际瓶子位置/倾角、轨迹关节位置/速度/加速度/时间以及错误；会话日志在 `work/sim.log`。单次验收需要实际抬升 ≥25 mm，B 点误差 ≤12 mm，瓶子倾角 ≤10°，一秒稳定性采样漂移 ≤3 mm。运行失败返回非零退出码。
 
 MoveIt 中携带瓶子碰撞体；Gazebo 中依靠夹爪接触摩擦，未用固定吸附。机器人惯性、联动、夹爪仍为简化代理，不能代替完整动力学/损伤验证。真机接口尚未实施。
