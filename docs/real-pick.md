@@ -139,3 +139,9 @@ bash scripts/run_real.sh --task check-path --execute
 用户授权的一次空载运行记录为 Jetson `work/real-pick-20260911T081923390075Z.json`。该次在 HOME 抬升阶段停止，没有进入横移：请求绝对目标 `(208,82)`，最终反馈 `(208,79)`；补偿动作编号从 1 递增到 2，SDK 报成功，但补偿期间 39 个新位置反馈均未产生净位移。因此这次不能归因于 DDS 反馈中断，尚不能确认是设备到位判定、机械限制或其他原因。未继续自动试跑，未更改 HOME/A/B、安全高度或容差。
 
 官方规格描述机械臂水平运动范围为 22 cm、垂直 15 cm，但未在该规格页建立本机 SDK 原点到实际地面/末端的对应关系，不能仅用它判定 `(236,62)` 是否可达：https://www.dji.com/robomaster-ep/specs 。B 点仍需实际空载验证。
+
+用户反馈该次停住时没有碰撞、抖动或持续嗡鸣。为区分稳定 3 mm 到位误差与此前横移少走 28 mm，新增可选 `--position-tolerance-mm 3`，默认仍为 2 mm，最多只允许 3 mm。该参数也用于判断是否已到安全高度，意味着目标高度 82 mm 的最低可接受反馈由 80 mm 变为 79 mm；坐标目标不变，异常轴偏移超过 5 mm 的立即停止阈值不变。须空载、清空通路并现场监督验证，不能据此宣称负载路径安全或 B 点可达。24 项单元测试通过。
+
+```bash
+bash scripts/run_real.sh --task check-path --position-tolerance-mm 3 --execute
+```

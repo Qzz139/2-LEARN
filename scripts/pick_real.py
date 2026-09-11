@@ -76,6 +76,9 @@ def layout(cfg):
 class Pick:
     def __init__(self, bot, cfg, record):
         self.bot, self.cfg, self.record = bot, cfg, record
+        self.tolerance = cfg.get("position_tolerance_mm", POSITION_TOLERANCE_MM)
+        if self.tolerance not in (2, 3):
+            raise ValueError("Position tolerance must be 2 or 3 mm")
         self.position = None
         self.position_time = 0
         self.position_sequence = 0
@@ -136,7 +139,7 @@ class Pick:
                 # a stable, measured 3-5 mm shortfall. Never retry a failed action,
                 # a horizontal move, a descent, or a correction itself.
                 shortfall = y - dy
-                if allow_upward_correction and x == 0 and y > 0 and dy > 0 and abs(dx) <= 2 and 3 <= shortfall <= 5:
+                if allow_upward_correction and x == 0 and y > 0 and dy > 0 and abs(dx) <= 2 and self.tolerance < shortfall <= 5:
                     measured = (dx, dy)
                     if short_reference is None or max(abs(a-b) for a,b in zip(measured, short_reference)) > 1:
                         short_since, short_reference, short_samples = self.position_time, measured, 1
@@ -148,14 +151,14 @@ class Pick:
                         self.move(stage + '_correction', 0, shortfall, allow_upward_correction=False)
                         after = self.fresh_position()
                         total = modular_delta(after, before)
-                        if max(abs(a-b) for a,b in zip(total, (x,y))) > POSITION_TOLERANCE_MM:
+                        if max(abs(a-b) for a,b in zip(total, (x,y))) > self.tolerance:
                             raise RuntimeError(stage + ': still outside tolerance after one upward correction')
                         self.record(stage + '_feedback', raw_before=before, raw_after=after,
                                     dx_mm=total[0], dy_mm=total[1], corrected=True)
                         return
                 else:
                     short_since, short_reference, short_samples = None, None, 0
-                if abs(dx - x) <= POSITION_TOLERANCE_MM and abs(dy - y) <= POSITION_TOLERANCE_MM:
+                if abs(dx - x) <= self.tolerance and abs(dy - y) <= self.tolerance:
                     measured = (dx, dy)
                     if stable_reference is None or max(abs(a-b) for a,b in zip(measured, stable_reference)) > 1:
                         stable_since, stable_reference, samples = self.position_time, measured, 1
@@ -209,14 +212,14 @@ class Pick:
         current = self.relative_position()
         target = (current[0] if x is None else x, current[1] if y is None else y)
         delta = (target[0] - current[0], target[1] - current[1])
-        if abs(delta[0]) > MAX_HORIZONTAL_SPAN_MM + POSITION_TOLERANCE_MM or abs(delta[1]) > MAX_COMMAND_MM + POSITION_TOLERANCE_MM or (delta[0] and delta[1]):
+        if abs(delta[0]) > MAX_HORIZONTAL_SPAN_MM + self.tolerance or abs(delta[1]) > MAX_COMMAND_MM + self.tolerance or (delta[0] and delta[1]):
             raise RuntimeError('Unsafe leg: require one axis, horizontal <=90 mm, vertical <=60 mm')
-        if max(abs(v) for v in delta) <= POSITION_TOLERANCE_MM:
+        if max(abs(v) for v in delta) <= self.tolerance:
             self.record(stage + '_already_at_target', target_mm=target, error_mm=delta)
             return
-        if abs(delta[0]) > MAX_COMMAND_MM + POSITION_TOLERANCE_MM:
+        if abs(delta[0]) > MAX_COMMAND_MM + self.tolerance:
             safe = layout(self.cfg)['safe_y']
-            if current[1] < safe - POSITION_TOLERANCE_MM:
+            if current[1] < safe - self.tolerance:
                 raise RuntimeError(stage + ': segmented traverse requires safe height')
             step = MAX_COMMAND_MM if delta[0] > 0 else -MAX_COMMAND_MM
             self.goto(stage + '_segment_1', x=current[0] + step)
@@ -229,8 +232,8 @@ class Pick:
             command = tuple(max(-MAX_COMMAND_MM, min(MAX_COMMAND_MM, v)) for v in delta)
             self.move(stage, *command)
         actual = self.relative_position()
-        if max(abs(a - b) for a, b in zip(actual, target)) > POSITION_TOLERANCE_MM:
-            raise RuntimeError(stage + ': taught endpoint error exceeds 2 mm')
+        if max(abs(a - b) for a, b in zip(actual, target)) > self.tolerance:
+            raise RuntimeError(stage + ': taught endpoint error exceeds %s mm' % self.tolerance)
 
     def run(self, home_only=False, check_path=False):
         points = layout(self.cfg)
@@ -241,7 +244,8 @@ class Pick:
         ymin = min(home[1], place[1], 0)
         if not xmin - 5 <= current[0] <= xmax + 5 or not ymin - 5 <= current[1] <= safe + 5:
             raise RuntimeError('Startup pose outside taught area; no automatic homing')
-        self.record('preflight', current_relative_to_A_mm=current, taught_layout=points)
+        self.record('preflight', current_relative_to_A_mm=current, taught_layout=points,
+                    position_tolerance_mm=self.tolerance)
         # Start empty. Bottle may be between the jaws but must rest on the floor.
         self.jaws(True, 'open_before_home')
         self.goto('home_raise', y=safe)
@@ -292,6 +296,8 @@ def main():
     parser.add_argument('--task', choices=['pick', 'home', 'release', 'check-path'], default='pick', help='Full cycle, empty HOME check, supported release, or empty full path with jaws open')
     parser.add_argument('--object-supported', action='store_true', help='For release only: bottle is on floor or securely supported by the operator')
     parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
+    parser.add_argument('--position-tolerance-mm', type=int, choices=(2, 3), default=2,
+                        help='Endpoint tolerance; default 2 mm, optional 3 mm for supervised validation')
     args = parser.parse_args()
     if args.teach and args.execute:
         parser.error('--teach and --execute cannot be combined')
@@ -299,6 +305,7 @@ def main():
         parser.error('Support the bottle first, then pass --object-supported; no commands sent')
     try:
         cfg = load_task(args.config, require_calibration=args.execute and args.task != 'release')
+        cfg['position_tolerance_mm'] = args.position_tolerance_mm
     except (ValueError, KeyError) as error:
         parser.error(str(error))
     if not args.execute and not args.teach:

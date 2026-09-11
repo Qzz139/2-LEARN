@@ -219,8 +219,22 @@ class RealPickTests(unittest.TestCase):
         self.assertEqual(calls, [(179, -3)])
 
     def test_stable_lift_shortfall_gets_only_one_upward_correction(self):
+        self.check_lift_shortfall(2, [(159,16),(159,16)])
+
+    def test_three_mm_tolerance_accepts_stable_shortfall_without_retry(self):
+        self.check_lift_shortfall(3, [(159,16)])
+
+    def test_larger_tolerance_rejected(self):
+        cfg = taught_config()
+        cfg['position_tolerance_mm'] = 4
+        with self.assertRaisesRegex(ValueError, 'tolerance'):
+            pick.Pick(SimpleNamespace(), cfg, lambda *args, **kw: None)
+
+    def check_lift_shortfall(self, tolerance, expected):
         clock, calls = [100.0], []
-        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        cfg = taught_config()
+        cfg['position_tolerance_mm'] = tolerance
+        task = pick.Pick(SimpleNamespace(), cfg, lambda *args, **kw: None)
         def move(x,y):
             calls.append((x,y))
             actual_y = y-3 if len(calls)==1 else y
@@ -233,7 +247,7 @@ class RealPickTests(unittest.TestCase):
         with patch.object(pick.time,'monotonic',lambda:clock[0]), patch.object(pick.time,'sleep',sleep):
             task.feedback((159,4294967293))
             task.move('lift',0,19)
-        self.assertEqual(calls,[(159,16),(159,16)])
+        self.assertEqual(calls,expected)
         self.assertIsNone(task.active)
 
     def test_home_horizontal_command_preserves_measured_height(self):
