@@ -113,3 +113,9 @@ bash scripts/run_real.sh --task release --object-supported --execute
 控制入口现使用官方 SDK `moveto`，将当前反馈位置加本段位移转换为明确的绝对目标。例如上述横移现在发送 `(176,80)`，明确保持高度 80 mm。DDS 无符号坐标按 32 位有符号数解释后用于 SDK 指令；这不是地面坐标标定。日志增加 `command_mode` 和 `absolute_target_sdk_mm`。局部范围、到位容差、异常轴运动停止及松爪确认均保留。15 项单元测试通过，包括该横移目标、无符号坐标转换和松爪后返回顺序；不代表真机验证通过。
 
 接口更改后先取走瓶子、确认通路空旷并在旁观察，只运行 `bash scripts/run_real.sh --task home --execute`。若仍发生非预期下降，停止使用自动流程，核查实际运动和位置反馈，不放宽检查或反复试跑。
+
+### 再次回收后的最新配置：执行被范围检查阻止
+
+用户随后要求 HOME、A 再向底盘收回 30 mm，B 不变。Jetson 本地配置现为 HOME=(146,82)、A=(146,62)、B=(236,62)，安全高度仍为 82。此前布局仅作为历史记录。新 A-B 跨度为 90 mm，超过现有 60 mm 局部布局限制。
+
+已运行用户要求的 `bash scripts/run_real.sh --task home --execute`，入口报错 `Taught layout exceeds the 60 mm local workspace`，在连接机器人前退出，没有发送运动指令。当前配置不能执行 HOME 或完整抓放；没有扩大范围限制，也没有验证新位置的可达性。变更前配置备份位于 Jetson `work/real_pick.before-second-retraction.json.bak`。
