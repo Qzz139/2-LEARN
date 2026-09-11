@@ -6,6 +6,10 @@
 
 课程原文要求桌面；地面版本是用户指定的场景调整，需确认教师接受。详见 [课程要求与覆盖范围](docs/course-requirements.md)、[模型边界](docs/model.md)、[地面瓶子验证](docs/bottle-validation.md) 和 [真机准备方案](docs/real-control-plan.md)。
 
+## 真机准备：通信检查
+
+Jetson 连接 EP 热点后执行 `python3 scripts/check_ep_connection.py`。仅检查 SDK 通信、版本和机械臂位置反馈，不发送运动命令；结果保存到 `work/ep-connection.json`。操作、已发现的坐标解码异常及下一步见 [真机连接说明](docs/real-connection.md)。真机抓取入口尚未实现，现有仿真入口保持不变。
+
 ## 项目结构
 
 ```text
@@ -15,6 +19,7 @@ src/
   ep_simulation/           模型、平面逆解、瓶子配置、场景、任务与 Launch
   ep_moveit_config/        MoveIt/OMPL、控制器和 RViz 配置
 scripts/                  构建、运行、停止入口
+config/                   真机连接参数（不含密码）
 tests/                    拓扑、运动学、可达性和场景测试
 docs/                     课程要求、来源、验证数据、真机计划
 work/                     日志和轨迹结果（不提交 Git）
