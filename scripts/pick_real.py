@@ -100,8 +100,15 @@ class Pick:
         before = self.fresh_position()
         sequence_before = self.position_sequence
         deadline = time.monotonic() + self.cfg['action_timeout_s']
-        self.record(stage + '_request', relative_x_mm=x, relative_y_mm=y)
-        self.active = self.bot.robotic_arm.move(x=x, y=y)
+        # DDS reports uint32; moveto requires signed Cartesian millimetres.
+        # Use explicit endpoints so every command also fixes the other axis.
+        signed_before = modular_delta(before, (0, 0))
+        target = tuple(v + d for v, d in zip(signed_before, (x, y)))
+        if any(not -2**31 <= v < 2**31 for v in target):
+            raise RuntimeError(stage + ': absolute target exceeds signed SDK range')
+        self.record(stage + '_request', relative_x_mm=x, relative_y_mm=y,
+                    command_mode='absolute_moveto', absolute_target_sdk_mm=target)
+        self.active = self.bot.robotic_arm.moveto(x=target[0], y=target[1])
         done = self.active.wait_for_completed(timeout=self.cfg['action_timeout_s'])
         self.record(stage + '_action', state=self.active.state)
         if not done or not self.active.has_succeeded:

@@ -28,8 +28,9 @@ class RealPickTests(unittest.TestCase):
         task = pick.Pick(bot, cfg, lambda stage, **kw: stages.append(stage))
         task.feedback(start)
         def move(x, y):
-            calls.append(('move', x, y))
-            task.feedback(tuple((v + d) % 2**32 for v, d in zip(task.position, (x, y))))
+            delta = pick.modular_delta((x, y), task.position)
+            calls.append(('move', *delta))
+            task.feedback((x % 2**32, y % 2**32))
             failed = stages[-1] == fail_at
             return SimpleNamespace(wait_for_completed=lambda timeout: True,
                                    has_succeeded=not failed, state='action_failed' if failed else 'action_succeeded')
@@ -40,7 +41,7 @@ class RealPickTests(unittest.TestCase):
             else:
                 task.gripper_feedback('normal')
             return True
-        bot.robotic_arm = SimpleNamespace(move=move)
+        bot.robotic_arm = SimpleNamespace(moveto=move)
         bot.gripper = SimpleNamespace(
             close=lambda power: calls.append(('close', power)) or True,
             open=opening,
@@ -131,7 +132,7 @@ class RealPickTests(unittest.TestCase):
         calls = []
         task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
         action = SimpleNamespace(wait_for_completed=lambda timeout: True, has_succeeded=True, state='action_succeeded')
-        task.bot.robotic_arm = SimpleNamespace(move=lambda x,y: calls.append((x,y)) or action)
+        task.bot.robotic_arm = SimpleNamespace(moveto=lambda x,y: calls.append((x,y)) or action)
         def sleep(dt):
             clock[0] += dt
             if delay is not None:
@@ -147,25 +148,42 @@ class RealPickTests(unittest.TestCase):
                 task.move('test', 20, 0)
                 self.assertGreaterEqual(clock[0], 101.3)
                 self.assertIsNone(task.active)
-        self.assertEqual(calls, [(20, 0)])
+        self.assertEqual(calls, [(179, -3)])
 
     def test_stable_lift_shortfall_gets_only_one_upward_correction(self):
         clock, calls = [100.0], []
         task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
         def move(x,y):
             calls.append((x,y))
-            delta = y-3 if len(calls)==1 else y
-            task.feedback((159, (task.position[1]+delta) % 2**32))
+            actual_y = y-3 if len(calls)==1 else y
+            task.feedback((x % 2**32, actual_y % 2**32))
             return SimpleNamespace(wait_for_completed=lambda timeout: True, has_succeeded=True, state='action_succeeded')
-        task.bot.robotic_arm = SimpleNamespace(move=move)
+        task.bot.robotic_arm = SimpleNamespace(moveto=move)
         def sleep(dt):
             clock[0] += dt
             task.feedback(task.position)
         with patch.object(pick.time,'monotonic',lambda:clock[0]), patch.object(pick.time,'sleep',sleep):
             task.feedback((159,4294967293))
             task.move('lift',0,19)
-        self.assertEqual(calls,[(0,19),(0,3)])
+        self.assertEqual(calls,[(159,16),(159,16)])
         self.assertIsNone(task.active)
+
+    def test_home_horizontal_command_preserves_measured_height(self):
+        clock, calls = [100.0], []
+        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        def moveto(x, y):
+            calls.append((x, y))
+            task.feedback((x, y))
+            return SimpleNamespace(wait_for_completed=lambda timeout: True,
+                                   has_succeeded=True, state='action_succeeded')
+        task.bot.robotic_arm = SimpleNamespace(moveto=moveto)
+        def sleep(dt):
+            clock[0] += dt
+            task.feedback(task.position)
+        with patch.object(pick.time, 'monotonic', lambda: clock[0]), patch.object(pick.time, 'sleep', sleep):
+            task.feedback((182, 80))
+            task.move('home_traverse', -6, 0)
+        self.assertEqual(calls, [(176, 80)])
 
 
 if __name__ == '__main__':
