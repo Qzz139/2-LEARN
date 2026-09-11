@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixed-Base Pick-and-Place with RoboMaster EP — Xuanye (Sawyer) Xu</title>
+<style>
+:root{color-scheme:light;--ink:#202b36;--muted:#53616c;--blue:#24485e;--rule:#cbd4da;--paper:#fff}
+*{box-sizing:border-box}body{margin:0;background:#e9edf0;color:var(--ink);font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.6}main{max-width:920px;margin:36px auto;padding:48px 64px;background:var(--paper);border-top:6px solid var(--blue)}.eyebrow,th,.meta,figcaption,footer{font-family:'Helvetica Neue',Helvetica,sans-serif}.eyebrow{margin:0 0 16px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);font-weight:700}h1{font-size:35px;line-height:1.16;font-weight:normal;margin:0 0 22px;max-width:690px}h2{font-size:20px;margin:25px 0 8px;color:var(--blue)}p{margin:0 0 12px}.meta{font-size:13px;line-height:1.7;padding-bottom:20px;border-bottom:1px solid var(--rule)}.abstract{margin:22px 0 0;padding-left:18px;border-left:3px solid var(--blue);font-size:15px}.abstract strong{font-variant:small-caps;letter-spacing:.03em}.flow{margin:16px 0;padding:13px 16px;background:#f1f5f7;text-align:center;font-size:14px;line-height:1.9}.flow span{white-space:nowrap}figure{margin:17px 0}svg{display:block;width:100%;height:auto;max-height:160px}figcaption{font-size:11px;color:var(--muted);line-height:1.5;margin-top:6px}table{border-collapse:collapse;width:100%;font-size:14px;margin:12px 0}th{font-size:11px;letter-spacing:.04em;text-align:left;color:var(--blue);background:#f1f5f7}th,td{padding:9px 10px;border-bottom:1px solid var(--rule);vertical-align:top}td:first-child{width:28%}.note{font-size:13px;color:var(--muted)}a{color:var(--blue);text-underline-offset:3px;overflow-wrap:anywhere}footer{margin-top:25px;border-top:1px solid var(--rule);padding-top:13px;font-size:11px;color:var(--muted);line-height:1.7}.num{font-variant-numeric:tabular-nums}h2,figcaption{break-after:avoid}figure,table,.flow{break-inside:avoid}
+@media(max-width:640px){main{margin:0;padding:28px 22px;border-top-width:5px}h1{font-size:29px}body{font-size:15px}table{font-size:12px}th,td{padding:8px 6px}}
+@media print{@page{size:A4;margin:15mm}body{background:white;font-size:10.5pt;line-height:1.45}main{margin:0;max-width:none;padding:5mm 0 0;border-top:3px solid var(--blue)}h1{font-size:24pt;margin-bottom:12px}h2{font-size:13pt;margin-top:16px}.meta{padding-bottom:12px;font-size:9pt}.abstract{margin-top:14px;font-size:10pt}.flow{font-size:9pt;padding:8px}.note,figcaption{font-size:8pt}table{font-size:9pt}th{font-size:8pt}footer{font-size:8pt}a{text-decoration:none}svg{max-height:110px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<p class="eyebrow">Robotics laboratory · Short technical report</p>
+<h1>Fixed-Base Pick-and-Place<br>with the RoboMaster EP</h1>
+<div class="meta"><strong>Xuanye(Sawyer) Xu</strong><br>Student ID: <span class="num">H00490299 / 24020036071</span><br>12 September 2026</div>
+</header>
+<section class="abstract" aria-label="Abstract"><p><strong>Abstract.</strong> This project investigates fixed-point bottle manipulation using a stationary RoboMaster EP chassis, its two-axis arm and gripper. A ROS 2 simulation and a Python hardware controller implement a home–pick–place–return sequence. Five simulation cycles met the defined acceptance criteria, and five recorded hardware runs completed their command sequences. Physical grasp success must be assessed separately from controller completion.</p></section>
+<section>
+<h2>1. Objective and experimental setup</h2>
+<p>The task is to pick up an upright 550 ml water bottle from the ground, transfer it forward and release it at a designated location. The bottle contains 150 ml of water. Chassis motion and visual object detection are outside this experiment; pickup and placement positions are predefined.</p>
+<p>The Jetson Orin environment uses ROS 2 Foxy, Gazebo 11 and MoveIt 2. Simulation reuses the <em>jeguzzi/robomaster_ros</em> model, with a simplified parallel gripper and rigid bottle. The assumed bottle dimensions are 227 mm × 64 mm, with a total simulated mass of 175 g. These values are modelling assumptions rather than measured material properties.</p>
+</section>
+<section>
+<h2>2. Control method</h2>
+<p>The simulation uses ROS 2 trajectory control. The hardware program uses the DJI Python SDK and explicit Cartesian targets, checking fresh position feedback after each movement. It confirms the gripper-open status before withdrawing from the placement point. Failures stop subsequent actions without an automatic release.</p>
+<div class="flow" aria-label="Task sequence"><span>Home</span> → <span>Approach A</span> → <span>Lower &amp; grip</span> → <span>Lift</span> → <span>Transfer to B</span> → <span>Lower &amp; release</span> → <span>Return home</span></div>
+<figure>
+<svg viewBox="0 0 700 150" role="img" aria-labelledby="waypoint-title waypoint-description" xmlns="http://www.w3.org/2000/svg">
+<title id="waypoint-title">Final hardware waypoint layout</title><desc id="waypoint-description">Home at SDK coordinates 146,82 is 20 millimetres above pickup A at 146,62. Placement B is 60 millimetres forward of A, at 206,62. The dashed path indicates transfer at the configured safe height.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#24485e"/></marker></defs>
+<path d="M170 100V35H530V100" fill="none" stroke="#24485e" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M190 128H510" stroke="#95a5af" stroke-width="1"/>
+<circle cx="170" cy="35" r="5" fill="#24485e"/><circle cx="170" cy="100" r="5" fill="#24485e"/><circle cx="530" cy="100" r="5" fill="#24485e"/>
+<g font-family="Helvetica, sans-serif" fill="#202b36" font-size="13"><text x="155" y="22" text-anchor="end">Home (146, 82)</text><text x="155" y="105" text-anchor="end">A (146, 62)</text><text x="545" y="105">B (206, 62)</text><text x="350" y="26" text-anchor="middle" fill="#53616c">Safe height: y = 82 mm</text><text x="350" y="145" text-anchor="middle" fill="#53616c">60 mm forward transfer</text></g>
+</svg>
+<figcaption>Figure 1. Configured hardware waypoints in SDK millimetres; schematic, not to scale. SDK coordinates are not ground-referenced world coordinates. Release is commanded 3 mm above B.</figcaption>
+</figure>
+<p>A 3 mm endpoint tolerance was adopted after supervised empty-path testing. The original B target at x = 236 mm repeatedly produced no forward progress near x = 208 mm. With operator approval, B was moved to x = 206 mm. Height recovery between long movement segments prevents downward error from being carried into the next segment.</p>
+</section>
+<section>
+<h2>3. Results</h2>
+<table>
+<caption class="note" style="text-align:left;margin-bottom:6px">Table 1. Recorded simulation and hardware outcomes.</caption>
+<thead><tr><th scope="col">Evaluation</th><th scope="col">Observation</th><th scope="col">Interpretation</th></tr></thead>
+<tbody>
+<tr><td>Simulation: five cycles</td><td>5/5 passed; lift 28.58–28.84 mm; placement error 3.43–3.57 mm.</td><td>Meets the simulation thresholds: lift ≥25 mm and placement error ≤12 mm.</td></tr>
+<tr><td>Hardware: empty path</td><td>Completed A→B→home, including the release command.</td><td>Verified the revised unloaded sequence.</td></tr>
+<tr><td>Hardware: last five pick runs</td><td>5/5 command sequences completed; total logged run time 15.44–17.30 s.</td><td>All recorded release completion and return home. Physical success is unlabelled in the JSON.</td></tr>
+</tbody>
+</table>
+<p class="note">Hardware results are from 11 September 2026. The <code>physical_grasp_success</code> field is null; command completion alone does not establish five successful, damage-free bottle transfers. Run times include connection and shutdown events.</p>
+</section>
+<section>
+<h2>4. Limitations and conclusion</h2>
+<p>The project demonstrates the simulated task and a functioning hardware command sequence. The simulation simplifies arm dynamics, gripper contact and bottle deformation. Hardware logs do not directly measure grip force, bottle pose or damage. Future work should label the physical outcomes against video evidence and unify the simulation and hardware backends behind one ROS 2 interface; the current hardware controller remains SDK-based.</p>
+</section>
+<footer>
+<strong>Code and evidence.</strong> <a href="https://github.com/Qzz139/2-LEARN">github.com/Qzz139/2-LEARN</a> · <a href="https://github.com/Qzz139/2-LEARN/blob/1a681ba345d42a0d4087c58d808f61a19c5ddfc0/docs/bottle-validation.md">Simulation evaluation</a> · <a href="https://github.com/Qzz139/2-LEARN/tree/1a681ba345d42a0d4087c58d808f61a19c5ddfc0/docs/validation/real/final-five-20260911">Hardware records and configuration</a><br>
+The submission archive contains the configuration snapshots, raw hardware records and both demonstration videos. Evidence snapshot: <span class="num">1a681ba</span>.
+</footer>
+</main>
+</body>
+</html>
