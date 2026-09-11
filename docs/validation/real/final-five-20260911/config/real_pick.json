@@ -1,0 +1,13 @@
+{
+  "water_ml": 150,
+  "home_raw_sdk_mm": null,
+  "pick_raw_sdk_mm": null,
+  "place_raw_sdk_mm": null,
+  "safe_y_raw_sdk_mm": null,
+  "release_clearance_mm": 3,
+  "grip_power": 25,
+  "grip_seconds": 1.5,
+  "open_power": 25,
+  "open_seconds": 1.5,
+  "action_timeout_s": 8
+}

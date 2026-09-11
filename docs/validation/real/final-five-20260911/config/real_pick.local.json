@@ -1,0 +1,24 @@
+{
+  "water_ml": 150,
+  "home_raw_sdk_mm": [
+    146,
+    82
+  ],
+  "pick_raw_sdk_mm": [
+    146,
+    62
+  ],
+  "place_raw_sdk_mm": [
+    206,
+    62
+  ],
+  "safe_y_raw_sdk_mm": 82,
+  "release_clearance_mm": 3,
+  "grip_power": 25,
+  "grip_seconds": 1.5,
+  "open_power": 25,
+  "open_seconds": 1.5,
+  "action_timeout_s": 8,
+  "layout_note": "User-approved HOME=(146,82), A=(146,62), B=(206,62), safe height=82, tolerance=3 mm. One empty full path passed: real-pick-20260911T082709640785Z.json. Loaded grasp success remains unverified.",
+  "position_tolerance_mm": 3
+}

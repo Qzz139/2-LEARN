@@ -1,0 +1,68 @@
+{
+  "selection": "Latest five mode=pick result filenames, without success filtering",
+  "files": [
+    {
+      "source": "/home/robot/projects/2-LEARN/config/real_pick.local.json",
+      "file": "config/real_pick.local.json",
+      "bytes": 565,
+      "sha256": "06a1a6e357c8a8fb3fd7cd594657d5f01e80f95ce0c8b52999cd35af9c5441e3"
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/config/real_pick.json",
+      "file": "config/real_pick.json",
+      "bytes": 273,
+      "sha256": "b02040f924761c9c9aff981036c0cdf72c79cc4a37b0093663d938b10bc97b88"
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/config/ep_connection.json",
+      "file": "config/ep_connection.json",
+      "bytes": 104,
+      "sha256": "02141e28f05e4a1cb4d23a809373c1970e1c3be644b5bb1051e42082932cf8e8"
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/work/real-pick-20260911T083131380709Z.json",
+      "file": "results/real-pick-20260911T083131380709Z.json",
+      "bytes": 9768,
+      "sha256": "728e877602a98a81719e9999c74290c10a6757852d61d4d4cc586635852efde4",
+      "mode": "pick",
+      "commands_completed": true,
+      "physical_grasp_success": null
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/work/real-pick-20260911T083153286911Z.json",
+      "file": "results/real-pick-20260911T083153286911Z.json",
+      "bytes": 9769,
+      "sha256": "d604fa496078da37509cbc48d5fd74e9ac28f4a8c65ba3c4c124a116224d4adb",
+      "mode": "pick",
+      "commands_completed": true,
+      "physical_grasp_success": null
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/work/real-pick-20260911T083211754344Z.json",
+      "file": "results/real-pick-20260911T083211754344Z.json",
+      "bytes": 9769,
+      "sha256": "0976feaaa1db9c9be1c3ecaecac5612a20516369494b19b0c568737a377dc886",
+      "mode": "pick",
+      "commands_completed": true,
+      "physical_grasp_success": null
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/work/real-pick-20260911T083231793951Z.json",
+      "file": "results/real-pick-20260911T083231793951Z.json",
+      "bytes": 9769,
+      "sha256": "ce397d572a6cc84e9f70aed5c7a56c374207fbe0a8cfae297224fa6f5ef3ed57",
+      "mode": "pick",
+      "commands_completed": true,
+      "physical_grasp_success": null
+    },
+    {
+      "source": "/home/robot/projects/2-LEARN/work/real-pick-20260911T083252794879Z.json",
+      "file": "results/real-pick-20260911T083252794879Z.json",
+      "bytes": 9768,
+      "sha256": "036973f851ce6e4cc7cb7e78fbb36726c35634c1202c3ffe72fd21af8a0de5d3",
+      "mode": "pick",
+      "commands_completed": true,
+      "physical_grasp_success": null
+    }
+  ]
+}

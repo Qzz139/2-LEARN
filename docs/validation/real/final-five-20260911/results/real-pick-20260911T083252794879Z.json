@@ -1,0 +1,460 @@
+{
+  "commands_completed": true,
+  "physical_grasp_success": null,
+  "config": {
+    "water_ml": 150,
+    "home_raw_sdk_mm": [
+      146,
+      82
+    ],
+    "pick_raw_sdk_mm": [
+      146,
+      62
+    ],
+    "place_raw_sdk_mm": [
+      206,
+      62
+    ],
+    "safe_y_raw_sdk_mm": 82,
+    "release_clearance_mm": 3,
+    "grip_power": 25,
+    "grip_seconds": 1.5,
+    "open_power": 25,
+    "open_seconds": 1.5,
+    "action_timeout_s": 8,
+    "layout_note": "User-approved HOME=(146,82), A=(146,62), B=(206,62), safe height=82, tolerance=3 mm. One empty full path passed: real-pick-20260911T082709640785Z.json. Loaded grasp success remains unverified.",
+    "position_tolerance_mm": 3
+  },
+  "events": [
+    {
+      "stage": "starting",
+      "time_utc": "2026-09-11T08:32:52.795149+00:00"
+    },
+    {
+      "stage": "preflight",
+      "time_utc": "2026-09-11T08:32:53.541673+00:00",
+      "current_relative_to_A_mm": [
+        1,
+        17
+      ],
+      "taught_layout": {
+        "home": [
+          0,
+          20
+        ],
+        "pick": [
+          0,
+          0
+        ],
+        "place": [
+          60,
+          0
+        ],
+        "safe_y": 20
+      },
+      "position_tolerance_mm": 3
+    },
+    {
+      "stage": "open_before_home_request",
+      "time_utc": "2026-09-11T08:32:53.542426+00:00",
+      "power": 25
+    },
+    {
+      "stage": "open_before_home_command_complete",
+      "time_utc": "2026-09-11T08:32:55.112914+00:00"
+    },
+    {
+      "stage": "home_raise_already_at_target",
+      "time_utc": "2026-09-11T08:32:55.114025+00:00",
+      "target_mm": [
+        1,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "home_traverse_already_at_target",
+      "time_utc": "2026-09-11T08:32:55.114889+00:00",
+      "target_mm": [
+        0,
+        17
+      ],
+      "error_mm": [
+        -1,
+        0
+      ]
+    },
+    {
+      "stage": "home_already_at_target",
+      "time_utc": "2026-09-11T08:32:55.115491+00:00",
+      "target_mm": [
+        1,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "approach_raise_already_at_target",
+      "time_utc": "2026-09-11T08:32:55.116080+00:00",
+      "target_mm": [
+        1,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "approach_A_already_at_target",
+      "time_utc": "2026-09-11T08:32:55.116670+00:00",
+      "target_mm": [
+        0,
+        17
+      ],
+      "error_mm": [
+        -1,
+        0
+      ]
+    },
+    {
+      "stage": "descend_A_request",
+      "time_utc": "2026-09-11T08:32:55.117279+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": -17,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        147,
+        62
+      ]
+    },
+    {
+      "stage": "descend_A_dispatched",
+      "time_utc": "2026-09-11T08:32:55.118266+00:00",
+      "action_id": 1,
+      "raw_before": [
+        147,
+        79
+      ],
+      "feedback_sequence": 9
+    },
+    {
+      "stage": "descend_A_action",
+      "time_utc": "2026-09-11T08:32:56.269539+00:00",
+      "state": "action_succeeded",
+      "action_id": 1,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        149,
+        65
+      ]
+    },
+    {
+      "stage": "descend_A_feedback",
+      "time_utc": "2026-09-11T08:32:57.275324+00:00",
+      "raw_before": [
+        147,
+        79
+      ],
+      "raw_after": [
+        148,
+        62
+      ],
+      "dx_mm": 1,
+      "dy_mm": -17,
+      "settled_samples": 3
+    },
+    {
+      "stage": "grip_request",
+      "time_utc": "2026-09-11T08:32:57.276857+00:00",
+      "power": 25
+    },
+    {
+      "stage": "grip_command_complete",
+      "time_utc": "2026-09-11T08:32:58.813182+00:00"
+    },
+    {
+      "stage": "lift_request",
+      "time_utc": "2026-09-11T08:32:58.814661+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": 20,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        148,
+        82
+      ]
+    },
+    {
+      "stage": "lift_dispatched",
+      "time_utc": "2026-09-11T08:32:58.816226+00:00",
+      "action_id": 2,
+      "raw_before": [
+        148,
+        62
+      ],
+      "feedback_sequence": 27
+    },
+    {
+      "stage": "lift_action",
+      "time_utc": "2026-09-11T08:32:59.550942+00:00",
+      "state": "action_succeeded",
+      "action_id": 2,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        151,
+        79
+      ]
+    },
+    {
+      "stage": "lift_feedback",
+      "time_utc": "2026-09-11T08:33:00.712468+00:00",
+      "raw_before": [
+        148,
+        62
+      ],
+      "raw_after": [
+        149,
+        80
+      ],
+      "dx_mm": 1,
+      "dy_mm": 18,
+      "settled_samples": 4
+    },
+    {
+      "stage": "transfer_B_request",
+      "time_utc": "2026-09-11T08:33:00.713623+00:00",
+      "relative_x_mm": 57,
+      "relative_y_mm": 0,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        206,
+        80
+      ]
+    },
+    {
+      "stage": "transfer_B_dispatched",
+      "time_utc": "2026-09-11T08:33:00.714771+00:00",
+      "action_id": 3,
+      "raw_before": [
+        149,
+        80
+      ],
+      "feedback_sequence": 36
+    },
+    {
+      "stage": "transfer_B_action",
+      "time_utc": "2026-09-11T08:33:01.370849+00:00",
+      "state": "action_succeeded",
+      "action_id": 3,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        201,
+        80
+      ]
+    },
+    {
+      "stage": "transfer_B_feedback",
+      "time_utc": "2026-09-11T08:33:02.323800+00:00",
+      "raw_before": [
+        149,
+        80
+      ],
+      "raw_after": [
+        205,
+        79
+      ],
+      "dx_mm": 56,
+      "dy_mm": -1,
+      "settled_samples": 3
+    },
+    {
+      "stage": "lower_B_request",
+      "time_utc": "2026-09-11T08:33:02.325741+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": -14,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        205,
+        65
+      ]
+    },
+    {
+      "stage": "lower_B_dispatched",
+      "time_utc": "2026-09-11T08:33:02.327411+00:00",
+      "action_id": 4,
+      "raw_before": [
+        205,
+        79
+      ],
+      "feedback_sequence": 44
+    },
+    {
+      "stage": "lower_B_action",
+      "time_utc": "2026-09-11T08:33:02.935303+00:00",
+      "state": "action_succeeded",
+      "action_id": 4,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        204,
+        69
+      ]
+    },
+    {
+      "stage": "lower_B_feedback",
+      "time_utc": "2026-09-11T08:33:04.088750+00:00",
+      "raw_before": [
+        205,
+        79
+      ],
+      "raw_after": [
+        204,
+        67
+      ],
+      "dx_mm": -1,
+      "dy_mm": -12,
+      "settled_samples": 3
+    },
+    {
+      "stage": "release_at_B_request",
+      "time_utc": "2026-09-11T08:33:04.090715+00:00",
+      "power": 25
+    },
+    {
+      "stage": "release_at_B_command_complete",
+      "time_utc": "2026-09-11T08:33:05.632167+00:00"
+    },
+    {
+      "stage": "withdraw_B_request",
+      "time_utc": "2026-09-11T08:33:05.633448+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": 17,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        204,
+        82
+      ]
+    },
+    {
+      "stage": "withdraw_B_dispatched",
+      "time_utc": "2026-09-11T08:33:05.635027+00:00",
+      "action_id": 5,
+      "raw_before": [
+        204,
+        65
+      ],
+      "feedback_sequence": 60
+    },
+    {
+      "stage": "withdraw_B_action",
+      "time_utc": "2026-09-11T08:33:06.230981+00:00",
+      "state": "action_succeeded",
+      "action_id": 5,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        205,
+        78
+      ]
+    },
+    {
+      "stage": "withdraw_B_feedback",
+      "time_utc": "2026-09-11T08:33:08.085674+00:00",
+      "raw_before": [
+        204,
+        65
+      ],
+      "raw_after": [
+        205,
+        79
+      ],
+      "dx_mm": 1,
+      "dy_mm": 14,
+      "settled_samples": 3
+    },
+    {
+      "stage": "return_traverse_request",
+      "time_utc": "2026-09-11T08:33:08.087867+00:00",
+      "relative_x_mm": -59,
+      "relative_y_mm": 0,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        146,
+        79
+      ]
+    },
+    {
+      "stage": "return_traverse_dispatched",
+      "time_utc": "2026-09-11T08:33:08.090124+00:00",
+      "action_id": 6,
+      "raw_before": [
+        205,
+        79
+      ],
+      "feedback_sequence": 72
+    },
+    {
+      "stage": "return_traverse_action",
+      "time_utc": "2026-09-11T08:33:08.792698+00:00",
+      "state": "action_succeeded",
+      "action_id": 6,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        150,
+        81
+      ]
+    },
+    {
+      "stage": "return_traverse_feedback",
+      "time_utc": "2026-09-11T08:33:09.745925+00:00",
+      "raw_before": [
+        205,
+        79
+      ],
+      "raw_after": [
+        147,
+        79
+      ],
+      "dx_mm": -58,
+      "dy_mm": 0,
+      "settled_samples": 4
+    },
+    {
+      "stage": "return_HOME_already_at_target",
+      "time_utc": "2026-09-11T08:33:09.748166+00:00",
+      "target_mm": [
+        1,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "returned_home",
+      "time_utc": "2026-09-11T08:33:09.749999+00:00",
+      "relative_to_A_mm": [
+        1,
+        17
+      ]
+    },
+    {
+      "stage": "commands_complete",
+      "time_utc": "2026-09-11T08:33:09.751968+00:00",
+      "notice": "Returned HOME; operator must verify bottle lifted, placed upright and undamaged"
+    },
+    {
+      "stage": "finished",
+      "time_utc": "2026-09-11T08:33:09.811586+00:00"
+    }
+  ],
+  "operator_observation_required": true,
+  "mode": "pick",
+  "motion_commands_sent": true,
+  "teach_completed": false
+}
