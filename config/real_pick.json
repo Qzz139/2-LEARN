@@ -1,0 +1,11 @@
+{
+  "water_ml": 150,
+  "lift_mm": 20,
+  "forward_mm": 30,
+  "release_clearance_mm": 3,
+  "grip_power": 25,
+  "grip_seconds": 1.5,
+  "open_power": 25,
+  "open_seconds": 1.5,
+  "action_timeout_s": 8
+}
