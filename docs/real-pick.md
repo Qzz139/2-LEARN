@@ -24,7 +24,7 @@ bash scripts/run_real.sh --teach home
 bash scripts/run_real.sh --teach pick
 
 # 3. 空夹爪移到 B 点的对应夹持高度时
-# 同一平地上，B 点高度应与 A 点相同；用户目标为向车头前方 30 mm
+# 同一平地上，B 点高度应与 A 点相同；当前布局中 B 在新 A 前方 60 mm
 bash scripts/run_real.sh --teach place
 
 # 4. 夹爪处于能沿 A/B/HOME 横向安全通过的高度时
@@ -104,4 +104,4 @@ bash scripts/run_real.sh --task release --object-supported --execute
 
 必须明确传入 `--object-supported`；它表示现场已确认支撑，不是程序自动测出了支撑。收到新的完全张开状态后才算松爪命令完成。
 
-HOME 本轮先按 A 后方 30 mm、安全高度设置；A 和 B 保持不变。这是拟定的靠底盘回收位，不是已确认的最近机械极限。当前 A=(206,62)、B=(236,62)、HOME=(176,82)，均为 SDK 毫米坐标，安全高度为 82。以后可在实际确认的更合适位置重新 `--teach home`，但仍受已设局部工作范围限制。
+按用户更正，HOME 和抓取点 A 都相对原布局向底盘收回 30 mm，B 保持原位。当前 A=(176,62)、B=(236,62)、HOME=(176,82)，均为 SDK 毫米坐标，安全高度为 82。HOME 位于新 A 正上方 20 mm，抓取后的向前搬运距离由 30 mm 增至 60 mm。瓶子也需要摆到新的 A 点。这是待实机验证的回收布局，不是已确认的最近机械极限。以后可在实际确认的更合适位置重新记录位置，但仍受已设局部工作范围限制。
