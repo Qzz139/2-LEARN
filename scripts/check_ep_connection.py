@@ -34,7 +34,25 @@ def load_config(path):
     return cfg
 
 
-def observe(bot, timeout, report):
+def query_signed_position(bot):
+    """SDK 0.1.1.62 has this query protocol but no public arm query method.
+
+    cmdset 0x33 / cmdid 0x14 reads position; response decodes <iii.
+    Keep this compatibility use isolated; it does not send an arm action.
+    """
+    from robomaster import protocol
+    request = protocol.ProtoRoboticArmGetPostion()
+    message = protocol.Msg(bot.client.hostbyte, bot.robotic_arm._host, request)
+    response = bot.client.send_sync_msg(message, timeout=3.0)
+    if response is None:
+        raise RuntimeError('Independent signed position query timed out')
+    data = response.get_proto()
+    if not isinstance(data, protocol.ProtoRoboticArmGetPostion) or data._retcode != 0:
+        raise RuntimeError('Independent signed position query was rejected')
+    return {'x_mm': float(data._x), 'y_mm': float(data._y)}
+
+
+def observe(bot, timeout, report, query_position=None):
     """Only initialize/query/subscribe/unsubscribe/close; injectable for tests."""
     subscribed = False
     samples = []
@@ -73,11 +91,23 @@ def observe(bot, timeout, report):
         # SDK 0.1.1.62 decodes position with <II. Preserve suspicious raw values.
         if any(abs(v) > 1000 for v in samples[-1].values()):
             report['position_valid'] = False
-            report['signed_int32_candidate_mm'] = {
+            candidate = report['signed_int32_candidate_mm'] = {
                 k: (v - 2**32 if v.is_integer() and 2**31 <= v < 2**32 else v)
                 for k, v in samples[-1].items()}
-            raise RuntimeError('Implausible raw arm coordinate; possible SDK unsigned decoding. Candidate is unverified; do not use it for motion.')
-        report['arm_position_mm'] = samples[-1]
+            if query_position is None:
+                raise RuntimeError('Implausible raw arm coordinate; possible SDK unsigned decoding. Candidate is unverified; do not use it for motion.')
+            queried = report['arm_position_signed_query_mm'] = query_position(bot)
+            if any(not math.isfinite(v) or abs(v) > 1000 for v in candidate.values()):
+                raise RuntimeError('Signed candidate also outside coarse sanity bounds')
+            if any(not math.isfinite(queried[k]) or abs(queried[k] - candidate[k]) > 3
+                   for k in ('x_mm', 'y_mm')):
+                raise RuntimeError('Subscription and independent signed position query disagree')
+            report['arm_position_mm'] = queried
+            report['position_decoding'] = 'signed_query_cross_checked_with_subscription_within_3mm'
+        else:
+            report['arm_position_mm'] = samples[-1]
+            report['position_decoding'] = 'sdk_subscription'
+        report['coordinate_calibrated'] = False
         report['position_valid'] = True
         report['stage'] = 'complete'
         report['success'] = True
@@ -103,7 +133,7 @@ def probe(cfg, report):
     config.ROBOT_IP_STR = cfg['robot_ip']
     report['local_ip'] = local_ip
     report['robot_ip'] = cfg['robot_ip']
-    observe(robot.Robot(), cfg['position_timeout_s'], report)
+    observe(robot.Robot(), cfg['position_timeout_s'], report, query_position=query_signed_position)
 
 
 def main():

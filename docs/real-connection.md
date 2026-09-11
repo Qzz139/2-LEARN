@@ -38,10 +38,12 @@ python3 scripts/check_ep_connection.py
 
 已读到 EP 固件 `01.01.1150`，收到机械臂原始位置 x=159、y=4294967293。已安装 SDK 的 `ArmSubject.decode()` 使用 `struct.unpack('<II', ...)`，即无符号 32 位整数。y 值若按有符号 32 位整数解释为 -3 mm，但尚未通过实物位置或其他反馈交叉验证。
 
-脚本保留原始值，额外输出 `signed_int32_candidate_mm` 供排查；不自动将候选值作为有效位置。超出 ±1000 mm 的原始坐标会失败停止：这是排除明显异常值的粗检查，不是 EP 的工作范围或运动限位。
+脚本保留原始值，额外输出 `signed_int32_candidate_mm` 供排查。遇到异常大坐标时，用 SDK 内置的独立位置查询协议 `ProtoRoboticArmGetPostion`（0x33/0x14，只查询）交叉核对；该响应按有符号整数解码。只有候选值在 ±1000 mm 粗检查范围内，且与独立查询相差不超过 3 mm，才接受查询值。否则失败退出，不自动接受候选值。该范围不是 EP 工作范围；即使通过，也没有完成实物坐标标定。
 
 加入异常检查后再次实测：通信成功，x=159、y=4294967292（有符号候选值 -4 mm），位置检查返回失败、进程退出码 1，未发送运动命令。原始结果见 [实机连接检查记录](validation/real/connection-check.json)。两次读取的候选值约为 -3 至 -4 mm，尚不据此确认物理位置。四项假设备测试全部通过。
 
-下一步先在现场核对机械臂姿态和坐标反馈，再编写/验证真机运动适配。现有 `pick_demo.py` 和仿真启动入口未修改；真机抓取程序、共享任务流程重构、ROS 2 真机轨迹接口都尚未实现。
+用户已确认机械臂、夹爪原装，照片中的黄色部分为胶带。2026-09-11 的最终交叉核对仍读到 x=159、y=4294967293，但独立位置查询超时；因此位置检查继续保持失败，未发送运动命令。记录见 [交叉核对结果](validation/real/signed-position-check.json)。六项假设备测试通过，包含查询一致与不一致两种情况。按用户要求控制工作量，不继续重复实机试验。
+
+下一步需解决反馈解码验证和坐标标定，再编写/验证真机运动适配。现有 `pick_demo.py` 和仿真启动入口未修改；真机抓取程序、共享任务流程重构、ROS 2 真机轨迹接口都尚未实现。
 
 参考：[官方 SDK 入门与查询接口](https://robomaster-dev.readthedocs.io/en/latest/python_sdk/beginner_ep.html)、[官方机械臂反馈解码实现](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/robotic_arm.py)。

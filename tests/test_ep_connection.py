@@ -67,6 +67,22 @@ class ConnectionTests(unittest.TestCase):
         self.assertNotIn('arm_position_mm', report)
         self.assertEqual(bot.calls[-2:], ['unsub_position', 'close'])
 
+    def test_signed_query_confirms_subscription_decoding(self):
+        bot, report = FakeRobot([(159, 4294967293)] * 2), {}
+        probe.observe(bot, 0.01, report, query_position=lambda _: {'x_mm': 159, 'y_mm': -3})
+        self.assertTrue(report['success'])
+        self.assertEqual(report['arm_position_mm']['y_mm'], -3)
+        self.assertEqual(report['arm_position_raw_sdk_mm']['y_mm'], 4294967293)
+        self.assertFalse(report['coordinate_calibrated'])
+
+    def test_signed_query_disagreement_stops(self):
+        bot, report = FakeRobot([(159, 4294967293)] * 2), {}
+        with self.assertRaisesRegex(RuntimeError, 'disagree'):
+            probe.observe(bot, 0.01, report, query_position=lambda _: {'x_mm': 159, 'y_mm': 50})
+        self.assertFalse(report['position_valid'])
+        self.assertNotIn('arm_position_mm', report)
+        self.assertEqual(bot.calls[-2:], ['unsub_position', 'close'])
+
 
 if __name__ == '__main__':
     unittest.main()

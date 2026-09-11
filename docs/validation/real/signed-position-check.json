@@ -1,0 +1,23 @@
+{
+  "success": false,
+  "checked_at_utc": "2026-09-11T06:36:21.402566+00:00",
+  "motion_commands_sent": false,
+  "stage": "arm_feedback_validation",
+  "connection_ok": true,
+  "position_valid": false,
+  "scope": "SDK connection and position feedback only; no movement or homing",
+  "sdk_version": "0.1.1.62",
+  "local_ip": "192.168.2.43",
+  "robot_ip": "192.168.2.1",
+  "robot_version": "01.01.1150",
+  "arm_position_raw_sdk_mm": {
+    "x_mm": 159.0,
+    "y_mm": 4294967293.0
+  },
+  "position_samples_received": 2,
+  "signed_int32_candidate_mm": {
+    "x_mm": 159.0,
+    "y_mm": -3.0
+  },
+  "error": "Independent signed position query timed out"
+}
