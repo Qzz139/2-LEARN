@@ -16,6 +16,8 @@ import time
 
 ROOT = Path(__file__).resolve().parent.parent
 POSITION_TOLERANCE_MM = 2
+MAX_HORIZONTAL_SPAN_MM = 90  # Requested layout, not a hardware reachability limit.
+MAX_COMMAND_MM = 60
 
 
 def load_task(path, require_calibration=False):
@@ -62,10 +64,10 @@ def layout(cfg):
     place = modular_delta(cfg['place_raw_sdk_mm'], anchor)
     safe = modular_delta((anchor[0], cfg['safe_y_raw_sdk_mm']), anchor)[1]
     clearance = cfg['release_clearance_mm']
-    if max(abs(v) for v in home + place) > 60 or not 5 <= safe <= 60:
-        raise ValueError('Taught layout exceeds the 60 mm local workspace')
-    if max(home[0], place[0], 0) - min(home[0], place[0], 0) > 60:
-        raise ValueError('Horizontal span exceeds 60 mm')
+    if max(abs(home[1]), abs(place[1])) > 60 or not 5 <= safe <= 60:
+        raise ValueError('Taught layout exceeds the 60 mm vertical workspace')
+    if max(home[0], place[0], 0) - min(home[0], place[0], 0) > MAX_HORIZONTAL_SPAN_MM:
+        raise ValueError('Horizontal span exceeds 90 mm')
     if safe < max(home[1], place[1] + clearance, 0) or safe - min(home[1], place[1], 0) > 60:
         raise ValueError('Safe height must be above HOME, A and the release pose, within 60 mm vertical span')
     return {'home': home, 'pick': (0, 0), 'place': place, 'safe_y': safe}
@@ -199,15 +201,22 @@ class Pick:
         current = self.relative_position()
         target = (current[0] if x is None else x, current[1] if y is None else y)
         delta = (target[0] - current[0], target[1] - current[1])
-        if any(abs(v) > 60 + POSITION_TOLERANCE_MM for v in delta) or (delta[0] and delta[1]):
-            raise RuntimeError('Unsafe leg: require one axis at a time and at most 60 mm')
+        if abs(delta[0]) > MAX_HORIZONTAL_SPAN_MM + POSITION_TOLERANCE_MM or abs(delta[1]) > MAX_COMMAND_MM + POSITION_TOLERANCE_MM or (delta[0] and delta[1]):
+            raise RuntimeError('Unsafe leg: require one axis, horizontal <=90 mm, vertical <=60 mm')
         if max(abs(v) for v in delta) <= POSITION_TOLERANCE_MM:
             self.record(stage + '_already_at_target', target_mm=target, error_mm=delta)
             return
-        # At a 60 mm layout boundary, measured endpoint error may add 1-2 mm.
-        # Cap the actual command at 60 mm and still check the taught target.
-        command = tuple(max(-60, min(60, v)) for v in delta)
-        self.move(stage, *command)
+        if abs(delta[0]) > MAX_COMMAND_MM + POSITION_TOLERANCE_MM:
+            safe = layout(self.cfg)['safe_y']
+            if current[1] < safe - POSITION_TOLERANCE_MM:
+                raise RuntimeError(stage + ': segmented traverse requires safe height')
+            step = MAX_COMMAND_MM if delta[0] > 0 else -MAX_COMMAND_MM
+            self.goto(stage + '_segment_1', x=current[0] + step)
+            self.goto(stage + '_segment_2', x=target[0])
+        else:
+            # Cap boundary corrections but retain the taught endpoint check.
+            command = tuple(max(-MAX_COMMAND_MM, min(MAX_COMMAND_MM, v)) for v in delta)
+            self.move(stage, *command)
         actual = self.relative_position()
         if max(abs(a - b) for a, b in zip(actual, target)) > POSITION_TOLERANCE_MM:
             raise RuntimeError(stage + ': taught endpoint error exceeds 2 mm')

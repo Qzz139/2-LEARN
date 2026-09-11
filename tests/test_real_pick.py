@@ -21,9 +21,9 @@ class RealPickTests(unittest.TestCase):
     def test_relative_delta_across_unsigned_wrap(self):
         self.assertEqual(pick.modular_delta((159, 17), (159, 4294967293)), (0, 20))
 
-    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False):
+    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False, cfg=None):
         calls, stages = [], []
-        cfg = taught_config()
+        cfg = taught_config() if cfg is None else cfg
         bot = SimpleNamespace()
         task = pick.Pick(bot, cfg, lambda stage, **kw: stages.append(stage))
         task.feedback(start)
@@ -93,6 +93,39 @@ class RealPickTests(unittest.TestCase):
     def test_missing_teaching_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Missing taught poses'):
             pick.load_task(ROOT / 'config/real_pick.json', require_calibration=True)
+
+    def retracted_config(self):
+        cfg = taught_config()
+        cfg.update(home_raw_sdk_mm=[146, 82], pick_raw_sdk_mm=[146, 62],
+                   place_raw_sdk_mm=[236, 62], safe_y_raw_sdk_mm=82)
+        return cfg
+
+    def test_90_mm_cycle_segments_both_directions_and_releases(self):
+        calls, stages, task, error = self.exercise(start=(146, 82), cfg=self.retracted_config())
+        self.assertIsNone(error)
+        horizontal = [c[1] for c in calls if c[0] == 'move' and c[1]]
+        self.assertEqual(horizontal, [60, 30, -60, -30])
+        self.assertEqual(task.relative_position(), (0, 20))
+        self.assertLess(stages.index('release_at_B_command_complete'), stages.index('withdraw_B_request'))
+
+    def test_first_segment_failure_stops_before_second_segment_and_release(self):
+        calls, stages, task, error = self.exercise(start=(146, 82), cfg=self.retracted_config(),
+                                                  fail_at='transfer_B_segment_1_request')
+        self.assertIn('SDK action failed', error)
+        self.assertNotIn('transfer_B_segment_2_request', stages)
+        self.assertNotIn('release_at_B_request', stages)
+
+    def test_layout_beyond_requested_90_mm_rejected(self):
+        cfg = self.retracted_config()
+        cfg['place_raw_sdk_mm'][0] = 237
+        with self.assertRaisesRegex(ValueError, 'Horizontal span'):
+            pick.layout(cfg)
+
+    def test_long_traverse_below_safe_height_has_no_motion(self):
+        task = pick.Pick(SimpleNamespace(), self.retracted_config(), lambda *args, **kw: None)
+        task.feedback((146, 62))
+        with self.assertRaisesRegex(RuntimeError, 'safe height'):
+            task.goto('transfer_B', x=90)
 
     def test_unsafe_height_rejected(self):
         cfg = taught_config()
