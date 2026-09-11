@@ -21,7 +21,7 @@ class RealPickTests(unittest.TestCase):
     def test_relative_delta_across_unsigned_wrap(self):
         self.assertEqual(pick.modular_delta((159, 17), (159, 4294967293)), (0, 20))
 
-    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True):
+    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False):
         calls, stages = [], []
         cfg = taught_config()
         bot = SimpleNamespace()
@@ -46,9 +46,15 @@ class RealPickTests(unittest.TestCase):
             open=opening,
             pause=lambda: calls.append(('pause',)) or True)
         error = None
-        with patch.object(pick.time, 'sleep'):
+        clock = [pick.time.monotonic()]
+        def sleep(dt):
+            clock[0] += dt
+            task.feedback(task.position)
+            if task.gripper_status is not None:
+                task.gripper_feedback(task.gripper_status)
+        with patch.object(pick.time, 'sleep', sleep), patch.object(pick.time, 'monotonic', lambda: clock[0]):
             try:
-                task.run()
+                task.run(home_only=home_only)
             except RuntimeError as exc:
                 error = str(exc)
         return calls, stages, task, error
@@ -97,6 +103,51 @@ class RealPickTests(unittest.TestCase):
         calls, stages, task, error = self.exercise(start=(139, 17))
         self.assertIsNone(error)
         self.assertEqual(task.relative_position(), (-20, 20))
+
+    def test_one_mm_correction_does_not_send_motion(self):
+        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        task.feedback((160, 17))
+        task.goto('home_traverse', x=0)
+
+    def test_home_only_never_grips_or_goes_to_B(self):
+        calls, stages, task, error = self.exercise(home_only=True)
+        self.assertIsNone(error)
+        self.assertEqual(task.relative_position(), (-20, 20))
+        self.assertNotIn('grip_request', stages)
+        self.assertNotIn('transfer_B_request', stages)
+        self.assertEqual(stages[-1], 'home_complete')
+
+    def test_delayed_feedback_waits_instead_of_reissuing_command(self):
+        self.check_feedback_timing(delay=0.9)
+
+    def test_success_reply_without_new_feedback_is_not_completion(self):
+        self.check_feedback_timing(delay=None, expected_error='stale')
+
+    def test_stationary_axis_drop_is_rejected(self):
+        self.check_feedback_timing(delay=0.1, displacement=(1, -7), expected_error='stationary axis')
+
+    def check_feedback_timing(self, delay, displacement=(20, 0), expected_error=None):
+        clock = [100.0]
+        calls = []
+        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        action = SimpleNamespace(wait_for_completed=lambda timeout: True, has_succeeded=True, state='action_succeeded')
+        task.bot.robotic_arm = SimpleNamespace(move=lambda x,y: calls.append((x,y)) or action)
+        def sleep(dt):
+            clock[0] += dt
+            if delay is not None:
+                delta = displacement if clock[0] >= 100 + delay else (0, 0)
+                task.feedback((159 + delta[0], (4294967293 + delta[1]) % 2**32))
+        with patch.object(pick.time, 'monotonic', lambda: clock[0]), patch.object(pick.time, 'sleep', sleep):
+            task.feedback((159, 4294967293))
+            if expected_error:
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    task.move('test', 20, 0)
+                self.assertIs(task.active, action)
+            else:
+                task.move('test', 20, 0)
+                self.assertGreaterEqual(clock[0], 101.3)
+                self.assertIsNone(task.active)
+        self.assertEqual(calls, [(20, 0)])
 
 
 if __name__ == '__main__':

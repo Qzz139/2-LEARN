@@ -15,6 +15,7 @@ import socket
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
+POSITION_TOLERANCE_MM = 2
 
 
 def load_task(path, require_calibration=False):
@@ -75,6 +76,7 @@ class Pick:
         self.bot, self.cfg, self.record = bot, cfg, record
         self.position = None
         self.position_time = 0
+        self.position_sequence = 0
         self.active = None
         self.gripper_status = None
         self.gripper_status_time = 0
@@ -87,6 +89,7 @@ class Pick:
         if len(value) == 2 and all(isinstance(v, (int, float)) and math.isfinite(v) and v == int(v) for v in value):
             self.position = tuple(value)
             self.position_time = time.monotonic()
+            self.position_sequence += 1
 
     def fresh_position(self):
         if self.position is None or time.monotonic() - self.position_time > 1:
@@ -95,19 +98,51 @@ class Pick:
 
     def move(self, stage, x, y):
         before = self.fresh_position()
+        sequence_before = self.position_sequence
+        deadline = time.monotonic() + self.cfg['action_timeout_s']
         self.record(stage + '_request', relative_x_mm=x, relative_y_mm=y)
         self.active = self.bot.robotic_arm.move(x=x, y=y)
         done = self.active.wait_for_completed(timeout=self.cfg['action_timeout_s'])
         self.record(stage + '_action', state=self.active.state)
         if not done or not self.active.has_succeeded:
             raise RuntimeError(stage + ': SDK action failed or timed out')
-        self.active = None
-        time.sleep(0.5)
-        after = self.fresh_position()
-        dx, dy = modular_delta(after, before)
-        self.record(stage + '_feedback', raw_before=before, raw_after=after, dx_mm=dx, dy_mm=dy)
-        if abs(dx - x) > 5 or abs(dy - y) > 5:
-            raise RuntimeError(stage + ': arm displacement differs from request by more than 5 mm')
+        # A success reply is not proof the arm has settled. Require new samples
+        # near the endpoint for >=0.4 s, instead of one fixed-delay snapshot.
+        last_sequence, stable_since, stable_reference, samples = sequence_before, None, None, 0
+        dx, dy = 0, 0
+        while time.monotonic() < deadline:
+            after = self.fresh_position()
+            if self.position_sequence != last_sequence:
+                last_sequence = self.position_sequence
+                dx, dy = modular_delta(after, before)
+                if (x == 0 and abs(dx) > 5) or (y == 0 and abs(dy) > 5):
+                    raise RuntimeError(stage + ': unexpected movement on stationary axis; measured (%s, %s) mm' % (dx, dy))
+                if abs(dx - x) <= POSITION_TOLERANCE_MM and abs(dy - y) <= POSITION_TOLERANCE_MM:
+                    measured = (dx, dy)
+                    if stable_reference is None or max(abs(a-b) for a,b in zip(measured, stable_reference)) > 1:
+                        stable_since, stable_reference, samples = self.position_time, measured, 1
+                    else:
+                        samples += 1
+                    if samples >= 3 and self.position_time - stable_since >= 0.4:
+                        self.record(stage + '_feedback', raw_before=before, raw_after=after,
+                                    dx_mm=dx, dy_mm=dy, settled_samples=samples)
+                        self.active = None
+                        return
+                else:
+                    stable_since, stable_reference, samples = None, None, 0
+            time.sleep(0.05)
+        raise RuntimeError(stage + ': endpoint did not settle; requested (%s, %s), measured (%s, %s) mm' % (x, y, dx, dy))
+
+    def wait_ready(self, timeout=3, need_gripper=False):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            arm_ready = self.position is not None and now - self.position_time <= 1
+            gripper_ready = self.gripper_status is not None and now - self.gripper_status_time <= 1
+            if arm_ready and (not need_gripper or gripper_ready):
+                return
+            time.sleep(0.05)
+        raise RuntimeError('Startup feedback timeout: arm or gripper status missing; no motion sent')
 
     def jaws(self, opening, stage=None):
         stage = stage or ('release' if opening else 'grip')
@@ -135,15 +170,15 @@ class Pick:
         delta = (target[0] - current[0], target[1] - current[1])
         if any(abs(v) > 60 for v in delta) or (delta[0] and delta[1]):
             raise RuntimeError('Unsafe leg: require one axis at a time and at most 60 mm')
-        if delta == (0, 0):
-            self.record(stage + '_already_at_target', target_mm=target)
+        if max(abs(v) for v in delta) <= POSITION_TOLERANCE_MM:
+            self.record(stage + '_already_at_target', target_mm=target, error_mm=delta)
             return
         self.move(stage, *delta)
         actual = self.relative_position()
-        if max(abs(a - b) for a, b in zip(actual, target)) > 5:
-            raise RuntimeError(stage + ': taught endpoint error exceeds 5 mm')
+        if max(abs(a - b) for a, b in zip(actual, target)) > POSITION_TOLERANCE_MM:
+            raise RuntimeError(stage + ': taught endpoint error exceeds 2 mm')
 
-    def run(self):
+    def run(self, home_only=False):
         points = layout(self.cfg)
         home, place, safe = points['home'], points['place'], points['safe_y']
         current = self.relative_position()
@@ -158,6 +193,9 @@ class Pick:
         self.goto('home_raise', y=safe)
         self.goto('home_traverse', x=home[0])
         self.goto('home', y=home[1])
+        if home_only:
+            self.record('home_complete', relative_to_A_mm=self.relative_position())
+            return
         self.goto('approach_raise', y=safe)
         self.goto('approach_A', x=0)
         self.goto('descend_A', y=0)
@@ -194,6 +232,7 @@ def main():
     parser.add_argument('--config', type=Path, default=local_config if local_config.exists() else ROOT / 'config/real_pick.json')
     parser.add_argument('--connection', type=Path, default=ROOT / 'config/ep_connection.json')
     parser.add_argument('--execute', action='store_true', help='Run the full physical sequence; operator must be present')
+    parser.add_argument('--task', choices=['pick', 'home'], default='pick', help='Full pick cycle or empty-gripper HOME check only')
     parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
     args = parser.parse_args()
     if args.teach and args.execute:
@@ -206,6 +245,7 @@ def main():
         print('预览，不连接机器人。HOME/A/B/安全高度均须记录并核对通路。')
         print(json.dumps(cfg, indent=2))
         print('回HOME → A上方 → 下降夹取 → 抬升 → B放置 → 撤离 → 返回HOME。执行需加 --execute。')
+        print('本次任务:', args.task)
         try:
             print('已记录布局（相对A，毫米）:', layout(cfg))
         except ValueError as error:
@@ -228,7 +268,7 @@ def main():
     output = work / ('real-pick-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
     report = {'commands_completed': False, 'physical_grasp_success': None,
               'config': cfg, 'events': [], 'operator_observation_required': True,
-              'mode': 'teach_' + args.teach if args.teach else 'full_pick',
+              'mode': 'teach_' + args.teach if args.teach else args.task,
               'motion_commands_sent': False, 'teach_completed': False}
 
     def record(stage, **data):
@@ -256,7 +296,7 @@ def main():
             gripper_subscribed = bool(bot.gripper.sub_status(freq=5, callback=task.gripper_feedback))
             if not gripper_subscribed:
                 raise RuntimeError('Gripper status subscription failed')
-        time.sleep(0.6)
+        task.wait_ready(need_gripper=not args.teach)
         if args.teach:
             first = task.fresh_position()
             time.sleep(0.6)
@@ -277,12 +317,12 @@ def main():
             report['teach_completed'] = True
             record('pose_saved', point=args.teach, raw_sdk_mm=raw, config_path=str(destination))
         else:
-            task.run()
+            task.run(home_only=args.task == 'home')
             report['commands_completed'] = True
-            record('commands_complete', notice='Returned HOME; operator must verify bottle lifted, placed upright and undamaged')
+            record('commands_complete', notice='HOME command complete; verify physical pose' if args.task == 'home' else 'Returned HOME; operator must verify bottle lifted, placed upright and undamaged')
     except (Exception, KeyboardInterrupt) as error:
         report['error'] = str(error)
-        record('stopped', notice='No automatic return or release. Cut power if motion continues.')
+        record('stopped', error=str(error), notice='No automatic return or release. Cut power if motion continues.')
         if task and not args.teach and report['motion_commands_sent']:
             task.stop_requests()
     finally:
