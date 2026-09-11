@@ -1,5 +1,16 @@
 # 真机完整流程：HOME → A 抓取 → B 放置 → 返回 HOME
 
+当前 Jetson 已通过一次空载完整路径验证的配置：HOME=(146,82)、A=(146,62)、B=(206,62)，安全高度 82 mm，到位容差 3 mm。B 由用户批准向底盘收回 30 mm。下文较早的坐标和失败记录属于调试历史。
+
+容差现可保存在 `config/real_pick.local.json` 的 `position_tolerance_mm` 字段；未设置时默认 2 mm，CLI `--position-tolerance-mm 2|3` 可临时覆盖。当前 Jetson 保存为 3 mm，因此常用命令无需额外参数：
+
+```bash
+# 瓶子取走、通路清空、现场有人负责停止：空载路径检查
+bash scripts/run_real.sh --task check-path --execute
+# 瓶子摆在新 A，准备好现场停止：带瓶完整抓放（尚未验证）
+bash scripts/run_real.sh --execute
+```
+
 主控程序是 `scripts/pick_real.py`，启动入口是 `scripts/run_real.sh`。仿真 `pick_demo.py` 保持不变。本入口直接调用 DJI SDK，尚未接入课程要求的共用 ROS 2 轨迹接口；完成动作顺序不代表整个课程验收已完成。
 
 ## 完整动作顺序
@@ -145,3 +156,7 @@ bash scripts/run_real.sh --task check-path --execute
 ```bash
 bash scripts/run_real.sh --task check-path --position-tolerance-mm 3 --execute
 ```
+
+用户授权的 3 mm 空载验证记录为 Jetson `work/real-pick-20260911T082458522701Z.json`。回 HOME、A 点升降和分段恢复高度均通过；第二段横移从 `(208,79)` 请求 `(236,79)`，40 个新位置反馈后仍为 `(208,77)`，动作编号正常递增至 6。程序停止，夹爪全程未闭合。因此小幅到位误差与 B 点路径不前进是两个独立问题；3 mm 容差不能解决后者，也没有将 28 mm 误差判为成功。
+
+用户随后授权 B 改为 `(206,62)`，并再次空载验证。记录为 Jetson `work/real-pick-20260911T082709640785Z.json`（仓库副本：`docs/validation/real/empty-path-retracted-B.json`）。该次通过 HOME→A→B→张开夹爪→返回 HOME 全流程，最终反馈 `(147,79)`，未发送夹紧命令。容差 3 mm 下的空载通过，不代表 150 ml 水瓶抓取、放置或连续五次成功；负载验证尚未执行。程序相关 26 项单元测试通过。

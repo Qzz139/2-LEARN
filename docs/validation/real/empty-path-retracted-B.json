@@ -1,0 +1,525 @@
+{
+  "commands_completed": true,
+  "physical_grasp_success": null,
+  "config": {
+    "water_ml": 150,
+    "home_raw_sdk_mm": [
+      146,
+      82
+    ],
+    "pick_raw_sdk_mm": [
+      146,
+      62
+    ],
+    "place_raw_sdk_mm": [
+      206,
+      62
+    ],
+    "safe_y_raw_sdk_mm": 82,
+    "release_clearance_mm": 3,
+    "grip_power": 25,
+    "grip_seconds": 1.5,
+    "open_power": 25,
+    "open_seconds": 1.5,
+    "action_timeout_s": 8,
+    "layout_note": "User approved B retraction to (206,62), HOME=(146,82), A=(146,62) unchanged. Empty-path validation with explicit 3 mm tolerance pending. Old B=(236,62) failed twice during the upper traverse.",
+    "position_tolerance_mm": 3
+  },
+  "events": [
+    {
+      "stage": "starting",
+      "time_utc": "2026-09-11T08:27:09.641009+00:00"
+    },
+    {
+      "stage": "preflight",
+      "time_utc": "2026-09-11T08:27:11.326388+00:00",
+      "current_relative_to_A_mm": [
+        62,
+        12
+      ],
+      "taught_layout": {
+        "home": [
+          0,
+          20
+        ],
+        "pick": [
+          0,
+          0
+        ],
+        "place": [
+          60,
+          0
+        ],
+        "safe_y": 20
+      },
+      "position_tolerance_mm": 3
+    },
+    {
+      "stage": "open_before_home_request",
+      "time_utc": "2026-09-11T08:27:11.327207+00:00",
+      "power": 25
+    },
+    {
+      "stage": "open_before_home_command_complete",
+      "time_utc": "2026-09-11T08:27:12.866651+00:00"
+    },
+    {
+      "stage": "home_raise_request",
+      "time_utc": "2026-09-11T08:27:12.867565+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": 8,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        208,
+        82
+      ]
+    },
+    {
+      "stage": "home_raise_dispatched",
+      "time_utc": "2026-09-11T08:27:12.869156+00:00",
+      "action_id": 1,
+      "raw_before": [
+        208,
+        74
+      ],
+      "feedback_sequence": 8
+    },
+    {
+      "stage": "home_raise_action",
+      "time_utc": "2026-09-11T08:27:12.988365+00:00",
+      "state": "action_succeeded",
+      "action_id": 1,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        208,
+        79
+      ]
+    },
+    {
+      "stage": "home_raise_feedback",
+      "time_utc": "2026-09-11T08:27:14.140918+00:00",
+      "raw_before": [
+        208,
+        74
+      ],
+      "raw_after": [
+        208,
+        79
+      ],
+      "dx_mm": 0,
+      "dy_mm": 5,
+      "settled_samples": 3
+    },
+    {
+      "stage": "home_traverse_request",
+      "time_utc": "2026-09-11T08:27:14.141844+00:00",
+      "relative_x_mm": -60,
+      "relative_y_mm": 0,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        148,
+        79
+      ]
+    },
+    {
+      "stage": "home_traverse_dispatched",
+      "time_utc": "2026-09-11T08:27:14.143650+00:00",
+      "action_id": 2,
+      "raw_before": [
+        208,
+        79
+      ],
+      "feedback_sequence": 14
+    },
+    {
+      "stage": "home_traverse_action",
+      "time_utc": "2026-09-11T08:27:14.996974+00:00",
+      "state": "action_succeeded",
+      "action_id": 2,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        151,
+        80
+      ]
+    },
+    {
+      "stage": "home_traverse_feedback",
+      "time_utc": "2026-09-11T08:27:15.407110+00:00",
+      "raw_before": [
+        208,
+        79
+      ],
+      "raw_after": [
+        149,
+        79
+      ],
+      "dx_mm": -59,
+      "dy_mm": 0,
+      "settled_samples": 3
+    },
+    {
+      "stage": "home_already_at_target",
+      "time_utc": "2026-09-11T08:27:15.408067+00:00",
+      "target_mm": [
+        3,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "approach_raise_already_at_target",
+      "time_utc": "2026-09-11T08:27:15.408974+00:00",
+      "target_mm": [
+        3,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "approach_A_already_at_target",
+      "time_utc": "2026-09-11T08:27:15.409652+00:00",
+      "target_mm": [
+        0,
+        17
+      ],
+      "error_mm": [
+        -3,
+        0
+      ]
+    },
+    {
+      "stage": "descend_A_request",
+      "time_utc": "2026-09-11T08:27:15.410453+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": -17,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        149,
+        62
+      ]
+    },
+    {
+      "stage": "descend_A_dispatched",
+      "time_utc": "2026-09-11T08:27:15.411718+00:00",
+      "action_id": 3,
+      "raw_before": [
+        149,
+        79
+      ],
+      "feedback_sequence": 21
+    },
+    {
+      "stage": "descend_A_action",
+      "time_utc": "2026-09-11T08:27:15.910260+00:00",
+      "state": "action_succeeded",
+      "action_id": 3,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        151,
+        65
+      ]
+    },
+    {
+      "stage": "descend_A_feedback",
+      "time_utc": "2026-09-11T08:27:17.113091+00:00",
+      "raw_before": [
+        149,
+        79
+      ],
+      "raw_after": [
+        150,
+        62
+      ],
+      "dx_mm": 1,
+      "dy_mm": -17,
+      "settled_samples": 3
+    },
+    {
+      "stage": "empty_path_skip_grip",
+      "time_utc": "2026-09-11T08:27:17.114211+00:00"
+    },
+    {
+      "stage": "lift_request",
+      "time_utc": "2026-09-11T08:27:17.115220+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": 20,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        150,
+        82
+      ]
+    },
+    {
+      "stage": "lift_dispatched",
+      "time_utc": "2026-09-11T08:27:17.116379+00:00",
+      "action_id": 4,
+      "raw_before": [
+        150,
+        62
+      ],
+      "feedback_sequence": 28
+    },
+    {
+      "stage": "lift_action",
+      "time_utc": "2026-09-11T08:27:18.114464+00:00",
+      "state": "action_succeeded",
+      "action_id": 4,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        154,
+        79
+      ]
+    },
+    {
+      "stage": "lift_feedback",
+      "time_utc": "2026-09-11T08:27:18.917336+00:00",
+      "raw_before": [
+        150,
+        62
+      ],
+      "raw_after": [
+        151,
+        80
+      ],
+      "dx_mm": 1,
+      "dy_mm": 18,
+      "settled_samples": 3
+    },
+    {
+      "stage": "transfer_B_request",
+      "time_utc": "2026-09-11T08:27:18.919226+00:00",
+      "relative_x_mm": 55,
+      "relative_y_mm": 0,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        206,
+        80
+      ]
+    },
+    {
+      "stage": "transfer_B_dispatched",
+      "time_utc": "2026-09-11T08:27:18.921316+00:00",
+      "action_id": 5,
+      "raw_before": [
+        151,
+        80
+      ],
+      "feedback_sequence": 38
+    },
+    {
+      "stage": "transfer_B_action",
+      "time_utc": "2026-09-11T08:27:19.546851+00:00",
+      "state": "action_succeeded",
+      "action_id": 5,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        202,
+        77
+      ]
+    },
+    {
+      "stage": "transfer_B_feedback",
+      "time_utc": "2026-09-11T08:27:20.950605+00:00",
+      "raw_before": [
+        151,
+        80
+      ],
+      "raw_after": [
+        205,
+        78
+      ],
+      "dx_mm": 54,
+      "dy_mm": -2,
+      "settled_samples": 3
+    },
+    {
+      "stage": "lower_B_request",
+      "time_utc": "2026-09-11T08:27:20.952632+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": -13,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        205,
+        65
+      ]
+    },
+    {
+      "stage": "lower_B_dispatched",
+      "time_utc": "2026-09-11T08:27:20.954851+00:00",
+      "action_id": 6,
+      "raw_before": [
+        205,
+        78
+      ],
+      "feedback_sequence": 48
+    },
+    {
+      "stage": "lower_B_action",
+      "time_utc": "2026-09-11T08:27:21.426947+00:00",
+      "state": "action_succeeded",
+      "action_id": 6,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        204,
+        69
+      ]
+    },
+    {
+      "stage": "lower_B_feedback",
+      "time_utc": "2026-09-11T08:27:24.133246+00:00",
+      "raw_before": [
+        205,
+        78
+      ],
+      "raw_after": [
+        204,
+        66
+      ],
+      "dx_mm": -1,
+      "dy_mm": -12,
+      "settled_samples": 3
+    },
+    {
+      "stage": "release_at_B_request",
+      "time_utc": "2026-09-11T08:27:24.134676+00:00",
+      "power": 25
+    },
+    {
+      "stage": "release_at_B_command_complete",
+      "time_utc": "2026-09-11T08:27:25.669381+00:00"
+    },
+    {
+      "stage": "withdraw_B_request",
+      "time_utc": "2026-09-11T08:27:25.670766+00:00",
+      "relative_x_mm": 0,
+      "relative_y_mm": 16,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        204,
+        82
+      ]
+    },
+    {
+      "stage": "withdraw_B_dispatched",
+      "time_utc": "2026-09-11T08:27:25.672311+00:00",
+      "action_id": 7,
+      "raw_before": [
+        204,
+        66
+      ],
+      "feedback_sequence": 71
+    },
+    {
+      "stage": "withdraw_B_action",
+      "time_utc": "2026-09-11T08:27:26.469738+00:00",
+      "state": "action_succeeded",
+      "action_id": 7,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        205,
+        77
+      ]
+    },
+    {
+      "stage": "withdraw_B_feedback",
+      "time_utc": "2026-09-11T08:27:28.174511+00:00",
+      "raw_before": [
+        204,
+        66
+      ],
+      "raw_after": [
+        205,
+        79
+      ],
+      "dx_mm": 1,
+      "dy_mm": 13,
+      "settled_samples": 3
+    },
+    {
+      "stage": "return_traverse_request",
+      "time_utc": "2026-09-11T08:27:28.176845+00:00",
+      "relative_x_mm": -59,
+      "relative_y_mm": 0,
+      "command_mode": "absolute_moveto",
+      "absolute_target_sdk_mm": [
+        146,
+        79
+      ]
+    },
+    {
+      "stage": "return_traverse_dispatched",
+      "time_utc": "2026-09-11T08:27:28.179525+00:00",
+      "action_id": 8,
+      "raw_before": [
+        205,
+        79
+      ],
+      "feedback_sequence": 83
+    },
+    {
+      "stage": "return_traverse_action",
+      "time_utc": "2026-09-11T08:27:28.908231+00:00",
+      "state": "action_succeeded",
+      "action_id": 8,
+      "sdk_percent": 100,
+      "sdk_action_xy": [
+        149,
+        80
+      ]
+    },
+    {
+      "stage": "return_traverse_feedback",
+      "time_utc": "2026-09-11T08:27:29.761379+00:00",
+      "raw_before": [
+        205,
+        79
+      ],
+      "raw_after": [
+        147,
+        79
+      ],
+      "dx_mm": -58,
+      "dy_mm": 0,
+      "settled_samples": 3
+    },
+    {
+      "stage": "return_HOME_already_at_target",
+      "time_utc": "2026-09-11T08:27:29.763859+00:00",
+      "target_mm": [
+        1,
+        20
+      ],
+      "error_mm": [
+        0,
+        3
+      ]
+    },
+    {
+      "stage": "returned_home",
+      "time_utc": "2026-09-11T08:27:29.766175+00:00",
+      "relative_to_A_mm": [
+        1,
+        17
+      ]
+    },
+    {
+      "stage": "commands_complete",
+      "time_utc": "2026-09-11T08:27:29.768092+00:00",
+      "notice": "Empty path complete; no close command sent; does not prove loaded grasp success"
+    },
+    {
+      "stage": "finished",
+      "time_utc": "2026-09-11T08:27:29.828761+00:00"
+    }
+  ],
+  "operator_observation_required": true,
+  "mode": "check-path",
+  "motion_commands_sent": true,
+  "teach_completed": false
+}

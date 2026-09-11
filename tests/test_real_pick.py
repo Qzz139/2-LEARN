@@ -2,6 +2,8 @@ import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+import json
+import tempfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -195,10 +197,15 @@ class RealPickTests(unittest.TestCase):
     def test_stationary_axis_drop_is_rejected(self):
         self.check_feedback_timing(delay=0.1, displacement=(1, -7), expected_error='stationary axis')
 
-    def check_feedback_timing(self, delay, displacement=(20, 0), expected_error=None):
+    def test_sdk_success_with_fresh_unchanged_feedback_still_fails(self):
+        self.check_feedback_timing(delay=0.1, displacement=(0, 0), expected_error='endpoint did not settle', tolerance=3)
+
+    def check_feedback_timing(self, delay, displacement=(20, 0), expected_error=None, tolerance=2):
         clock = [100.0]
         calls = []
-        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        cfg = taught_config()
+        cfg['position_tolerance_mm'] = tolerance
+        task = pick.Pick(SimpleNamespace(), cfg, lambda *args, **kw: None)
         action = SimpleNamespace(wait_for_completed=lambda timeout: True, has_succeeded=True, state='action_succeeded')
         task.bot.robotic_arm = SimpleNamespace(moveto=lambda x,y: calls.append((x,y)) or action)
         def sleep(dt):
@@ -229,6 +236,18 @@ class RealPickTests(unittest.TestCase):
         cfg['position_tolerance_mm'] = 4
         with self.assertRaisesRegex(ValueError, 'tolerance'):
             pick.Pick(SimpleNamespace(), cfg, lambda *args, **kw: None)
+
+    def test_configured_tolerance_round_trip_and_bounds(self):
+        cfg = taught_config()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.json'
+            cfg['position_tolerance_mm'] = 3
+            path.write_text(json.dumps(cfg))
+            self.assertEqual(pick.load_task(path)['position_tolerance_mm'], 3)
+            cfg['position_tolerance_mm'] = 4
+            path.write_text(json.dumps(cfg))
+            with self.assertRaisesRegex(ValueError, 'position_tolerance_mm'):
+                pick.load_task(path)
 
     def check_lift_shortfall(self, tolerance, expected):
         clock, calls = [100.0], []

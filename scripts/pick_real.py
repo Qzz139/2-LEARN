@@ -22,7 +22,8 @@ MAX_COMMAND_MM = 60
 
 def load_task(path, require_calibration=False):
     cfg = json.loads(Path(path).read_text())
-    limits = {'water_ml': (0, 150),
+    cfg.setdefault('position_tolerance_mm', POSITION_TOLERANCE_MM)
+    limits = {'water_ml': (0, 150), 'position_tolerance_mm': (2, 3),
               'release_clearance_mm': (2, 5), 'grip_power': (1, 30),
               'open_power': (1, 30), 'grip_seconds': (0.2, 2),
               'open_seconds': (0.2, 2), 'action_timeout_s': (3, 15)}
@@ -296,8 +297,8 @@ def main():
     parser.add_argument('--task', choices=['pick', 'home', 'release', 'check-path'], default='pick', help='Full cycle, empty HOME check, supported release, or empty full path with jaws open')
     parser.add_argument('--object-supported', action='store_true', help='For release only: bottle is on floor or securely supported by the operator')
     parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
-    parser.add_argument('--position-tolerance-mm', type=int, choices=(2, 3), default=2,
-                        help='Endpoint tolerance; default 2 mm, optional 3 mm for supervised validation')
+    parser.add_argument('--position-tolerance-mm', type=int, choices=(2, 3), default=None,
+                        help='Override configured endpoint tolerance (2 or 3 mm); old configs default to 2')
     args = parser.parse_args()
     if args.teach and args.execute:
         parser.error('--teach and --execute cannot be combined')
@@ -305,7 +306,8 @@ def main():
         parser.error('Support the bottle first, then pass --object-supported; no commands sent')
     try:
         cfg = load_task(args.config, require_calibration=args.execute and args.task != 'release')
-        cfg['position_tolerance_mm'] = args.position_tolerance_mm
+        if args.position_tolerance_mm is not None:
+            cfg['position_tolerance_mm'] = args.position_tolerance_mm
     except (ValueError, KeyError) as error:
         parser.error(str(error))
     if not args.execute and not args.teach:
