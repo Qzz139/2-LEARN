@@ -88,3 +88,20 @@ bash scripts/run_real.sh --task home --execute
 历史短流程首次启动连接超时，未发送抓取命令，见 [历史启动记录](validation/real/first-pick-attempt.json)。本版完整流程的实机抓取成功率尚未验证。
 
 参考：[官方 SDK 夹爪接口](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/gripper.py)、[官方动作状态实现](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/action.py)、[既有 ROS 驱动取消请求方法](https://github.com/jeguzzi/robomaster_ros/blob/c05a39d7f0fa8b3b277aa74826aa92e202efc987/robomaster_ros/robomaster_ros/action.py)。
+
+
+## 抬升短差与单独松爪
+
+2026-09-11 最新失败发生在 `lift`：要求上抬 19 mm、反馈 16 mm，未达到 2 mm 容差，因此流程没有执行 B 点放置和松爪。不能在该失败分支自动张开，以免悬空瓶子掉落。
+
+现对 SDK 已报告成功、反馈稳定至少 1 秒、仅向上少走 3–5 mm 的情况，允许一次等量向上补偿。补偿本身不再补偿；失败、横移、下降或错误方向移动不重试。最终仍需满足 2 mm 容差。这一补偿尚未实机验证。
+
+需要先取下瓶子时，托稳瓶子或确认已落地，再执行只松爪命令（没有机械臂运动）：
+
+```bash
+bash scripts/run_real.sh --task release --object-supported --execute
+```
+
+必须明确传入 `--object-supported`；它表示现场已确认支撑，不是程序自动测出了支撑。收到新的完全张开状态后才算松爪命令完成。
+
+HOME 本轮先按 A 后方 30 mm、安全高度设置；A 和 B 保持不变。这是拟定的靠底盘回收位，不是已确认的最近机械极限。当前 A=(206,62)、B=(236,62)、HOME=(176,82)，均为 SDK 毫米坐标，安全高度为 82。以后可在实际确认的更合适位置重新 `--teach home`，但仍受已设局部工作范围限制。

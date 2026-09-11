@@ -96,7 +96,7 @@ class Pick:
             raise RuntimeError('Arm feedback missing or stale; subsequent motion stopped')
         return self.position
 
-    def move(self, stage, x, y):
+    def move(self, stage, x, y, allow_upward_correction=True):
         before = self.fresh_position()
         sequence_before = self.position_sequence
         deadline = time.monotonic() + self.cfg['action_timeout_s']
@@ -109,6 +109,7 @@ class Pick:
         # A success reply is not proof the arm has settled. Require new samples
         # near the endpoint for >=0.4 s, instead of one fixed-delay snapshot.
         last_sequence, stable_since, stable_reference, samples = sequence_before, None, None, 0
+        short_since, short_reference, short_samples = None, None, 0
         dx, dy = 0, 0
         while time.monotonic() < deadline:
             after = self.fresh_position()
@@ -117,6 +118,29 @@ class Pick:
                 dx, dy = modular_delta(after, before)
                 if (x == 0 and abs(dx) > 5) or (y == 0 and abs(dy) > 5):
                     raise RuntimeError(stage + ': unexpected movement on stationary axis; measured (%s, %s) mm' % (dx, dy))
+                # One small upward correction only after a successful action and
+                # a stable, measured 3-5 mm shortfall. Never retry a failed action,
+                # a horizontal move, a descent, or a correction itself.
+                shortfall = y - dy
+                if allow_upward_correction and x == 0 and y > 0 and dy > 0 and abs(dx) <= 2 and 3 <= shortfall <= 5:
+                    measured = (dx, dy)
+                    if short_reference is None or max(abs(a-b) for a,b in zip(measured, short_reference)) > 1:
+                        short_since, short_reference, short_samples = self.position_time, measured, 1
+                    else:
+                        short_samples += 1
+                    if short_samples >= 4 and self.position_time - short_since >= 1:
+                        self.record(stage + '_upward_correction', shortfall_mm=shortfall, measured_mm=measured)
+                        self.active = None
+                        self.move(stage + '_correction', 0, shortfall, allow_upward_correction=False)
+                        after = self.fresh_position()
+                        total = modular_delta(after, before)
+                        if max(abs(a-b) for a,b in zip(total, (x,y))) > POSITION_TOLERANCE_MM:
+                            raise RuntimeError(stage + ': still outside tolerance after one upward correction')
+                        self.record(stage + '_feedback', raw_before=before, raw_after=after,
+                                    dx_mm=total[0], dy_mm=total[1], corrected=True)
+                        return
+                else:
+                    short_since, short_reference, short_samples = None, None, 0
                 if abs(dx - x) <= POSITION_TOLERANCE_MM and abs(dy - y) <= POSITION_TOLERANCE_MM:
                     measured = (dx, dy)
                     if stable_reference is None or max(abs(a-b) for a,b in zip(measured, stable_reference)) > 1:
@@ -168,12 +192,15 @@ class Pick:
         current = self.relative_position()
         target = (current[0] if x is None else x, current[1] if y is None else y)
         delta = (target[0] - current[0], target[1] - current[1])
-        if any(abs(v) > 60 for v in delta) or (delta[0] and delta[1]):
+        if any(abs(v) > 60 + POSITION_TOLERANCE_MM for v in delta) or (delta[0] and delta[1]):
             raise RuntimeError('Unsafe leg: require one axis at a time and at most 60 mm')
         if max(abs(v) for v in delta) <= POSITION_TOLERANCE_MM:
             self.record(stage + '_already_at_target', target_mm=target, error_mm=delta)
             return
-        self.move(stage, *delta)
+        # At a 60 mm layout boundary, measured endpoint error may add 1-2 mm.
+        # Cap the actual command at 60 mm and still check the taught target.
+        command = tuple(max(-60, min(60, v)) for v in delta)
+        self.move(stage, *command)
         actual = self.relative_position()
         if max(abs(a - b) for a, b in zip(actual, target)) > POSITION_TOLERANCE_MM:
             raise RuntimeError(stage + ': taught endpoint error exceeds 2 mm')
@@ -232,13 +259,16 @@ def main():
     parser.add_argument('--config', type=Path, default=local_config if local_config.exists() else ROOT / 'config/real_pick.json')
     parser.add_argument('--connection', type=Path, default=ROOT / 'config/ep_connection.json')
     parser.add_argument('--execute', action='store_true', help='Run the full physical sequence; operator must be present')
-    parser.add_argument('--task', choices=['pick', 'home'], default='pick', help='Full pick cycle or empty-gripper HOME check only')
+    parser.add_argument('--task', choices=['pick', 'home', 'release'], default='pick', help='Full cycle, empty HOME check, or supported-object release only')
+    parser.add_argument('--object-supported', action='store_true', help='For release only: bottle is on floor or securely supported by the operator')
     parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
     args = parser.parse_args()
     if args.teach and args.execute:
         parser.error('--teach and --execute cannot be combined')
+    if args.execute and args.task == 'release' and not args.object_supported:
+        parser.error('Support the bottle first, then pass --object-supported; no commands sent')
     try:
-        cfg = load_task(args.config, require_calibration=args.execute)
+        cfg = load_task(args.config, require_calibration=args.execute and args.task != 'release')
     except (ValueError, KeyError) as error:
         parser.error(str(error))
     if not args.execute and not args.teach:
@@ -289,14 +319,16 @@ def main():
         if not bot.initialize(conn_type='ap', proto_type='udp'):
             raise RuntimeError('SDK connection failed')
         task = Pick(bot, cfg, record)
-        subscribed = bool(bot.robotic_arm.sub_position(freq=5, callback=task.feedback))
-        if not subscribed:
-            raise RuntimeError('Arm feedback subscription failed')
+        if args.task != 'release' or args.teach:
+            subscribed = bool(bot.robotic_arm.sub_position(freq=5, callback=task.feedback))
+            if not subscribed:
+                raise RuntimeError('Arm feedback subscription failed')
         if not args.teach:
             gripper_subscribed = bool(bot.gripper.sub_status(freq=5, callback=task.gripper_feedback))
             if not gripper_subscribed:
                 raise RuntimeError('Gripper status subscription failed')
-        task.wait_ready(need_gripper=not args.teach)
+        if args.task != 'release' or args.teach:
+            task.wait_ready(need_gripper=not args.teach)
         if args.teach:
             first = task.fresh_position()
             time.sleep(0.6)
@@ -317,9 +349,15 @@ def main():
             report['teach_completed'] = True
             record('pose_saved', point=args.teach, raw_sdk_mm=raw, config_path=str(destination))
         else:
-            task.run(home_only=args.task == 'home')
+            if args.task == 'release':
+                task.jaws(True, 'supported_release')
+            else:
+                task.run(home_only=args.task == 'home')
             report['commands_completed'] = True
-            record('commands_complete', notice='HOME command complete; verify physical pose' if args.task == 'home' else 'Returned HOME; operator must verify bottle lifted, placed upright and undamaged')
+            notices = {'release': 'Gripper opened; no arm move requested',
+                       'home': 'HOME command complete; verify physical pose',
+                       'pick': 'Returned HOME; operator must verify bottle lifted, placed upright and undamaged'}
+            record('commands_complete', notice=notices[args.task])
     except (Exception, KeyboardInterrupt) as error:
         report['error'] = str(error)
         record('stopped', error=str(error), notice='No automatic return or release. Cut power if motion continues.')

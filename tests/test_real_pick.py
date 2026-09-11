@@ -149,6 +149,24 @@ class RealPickTests(unittest.TestCase):
                 self.assertIsNone(task.active)
         self.assertEqual(calls, [(20, 0)])
 
+    def test_stable_lift_shortfall_gets_only_one_upward_correction(self):
+        clock, calls = [100.0], []
+        task = pick.Pick(SimpleNamespace(), taught_config(), lambda *args, **kw: None)
+        def move(x,y):
+            calls.append((x,y))
+            delta = y-3 if len(calls)==1 else y
+            task.feedback((159, (task.position[1]+delta) % 2**32))
+            return SimpleNamespace(wait_for_completed=lambda timeout: True, has_succeeded=True, state='action_succeeded')
+        task.bot.robotic_arm = SimpleNamespace(move=move)
+        def sleep(dt):
+            clock[0] += dt
+            task.feedback(task.position)
+        with patch.object(pick.time,'monotonic',lambda:clock[0]), patch.object(pick.time,'sleep',sleep):
+            task.feedback((159,4294967293))
+            task.move('lift',0,19)
+        self.assertEqual(calls,[(0,19),(0,3)])
+        self.assertIsNone(task.active)
+
 
 if __name__ == '__main__':
     unittest.main()
