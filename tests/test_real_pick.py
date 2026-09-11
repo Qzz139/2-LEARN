@@ -21,7 +21,7 @@ class RealPickTests(unittest.TestCase):
     def test_relative_delta_across_unsigned_wrap(self):
         self.assertEqual(pick.modular_delta((159, 17), (159, 4294967293)), (0, 20))
 
-    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False, cfg=None):
+    def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False, cfg=None, check_path=False):
         calls, stages = [], []
         cfg = taught_config() if cfg is None else cfg
         bot = SimpleNamespace()
@@ -55,7 +55,7 @@ class RealPickTests(unittest.TestCase):
                 task.gripper_feedback(task.gripper_status)
         with patch.object(pick.time, 'sleep', sleep), patch.object(pick.time, 'monotonic', lambda: clock[0]):
             try:
-                task.run(home_only=home_only)
+                task.run(home_only=home_only, check_path=check_path)
             except RuntimeError as exc:
                 error = str(exc)
         return calls, stages, task, error
@@ -107,6 +107,41 @@ class RealPickTests(unittest.TestCase):
         self.assertEqual(horizontal, [60, 30, -60, -30])
         self.assertEqual(task.relative_position(), (0, 20))
         self.assertLess(stages.index('release_at_B_command_complete'), stages.index('withdraw_B_request'))
+
+    def test_empty_path_never_closes_gripper(self):
+        calls, stages, task, error = self.exercise(start=(146, 82), cfg=self.retracted_config(), check_path=True)
+        self.assertIsNone(error)
+        self.assertFalse(any(c[0] == 'close' for c in calls))
+        self.assertIn('empty_path_skip_grip', stages)
+        self.assertEqual(stages[-1], 'returned_home')
+
+    def test_segment_height_restored_before_second_horizontal_command(self):
+        task = pick.Pick(SimpleNamespace(), self.retracted_config(), lambda *args, **kw: None)
+        task.feedback((146, 80))
+        calls = []
+        def move(stage, x, y):
+            calls.append((stage, x, y))
+            actual_y = task.position[1] + y - (2 if len(calls)==1 else 0)
+            task.feedback((task.position[0]+x, actual_y))
+        task.move = move
+        task.goto('transfer_B', x=90)
+        self.assertEqual(calls, [('transfer_B_segment_1',60,0),
+                                 ('transfer_B_restore_height',0,4),
+                                 ('transfer_B_segment_2',30,0)])
+
+    def test_height_restore_failure_prevents_second_segment(self):
+        task = pick.Pick(SimpleNamespace(), self.retracted_config(), lambda *args, **kw: None)
+        task.feedback((146,80))
+        calls = []
+        def move(stage,x,y):
+            calls.append(stage)
+            if stage.endswith('restore_height'):
+                raise RuntimeError('height restoration failed')
+            task.feedback((206,78))
+        task.move = move
+        with self.assertRaisesRegex(RuntimeError, 'height restoration failed'):
+            task.goto('transfer_B', x=90)
+        self.assertNotIn('transfer_B_segment_2', calls)
 
     def test_first_segment_failure_stops_before_second_segment_and_release(self):
         calls, stages, task, error = self.exercise(start=(146, 82), cfg=self.retracted_config(),

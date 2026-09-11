@@ -111,8 +111,13 @@ class Pick:
         self.record(stage + '_request', relative_x_mm=x, relative_y_mm=y,
                     command_mode='absolute_moveto', absolute_target_sdk_mm=target)
         self.active = self.bot.robotic_arm.moveto(x=target[0], y=target[1])
+        self.record(stage + '_dispatched', action_id=getattr(self.active, '_action_id', None),
+                    raw_before=before, feedback_sequence=sequence_before)
         done = self.active.wait_for_completed(timeout=self.cfg['action_timeout_s'])
-        self.record(stage + '_action', state=self.active.state)
+        self.record(stage + '_action', state=self.active.state,
+                    action_id=getattr(self.active, '_action_id', None),
+                    sdk_percent=getattr(self.active, '_percent', None),
+                    sdk_action_xy=[getattr(self.active, '_x', None), getattr(self.active, '_y', None)])
         if not done or not self.active.has_succeeded:
             raise RuntimeError(stage + ': SDK action failed or timed out')
         # A success reply is not proof the arm has settled. Require new samples
@@ -164,6 +169,9 @@ class Pick:
                 else:
                     stable_since, stable_reference, samples = None, None, 0
             time.sleep(0.05)
+        self.record(stage + '_endpoint_timeout', requested_delta_mm=(x, y),
+                    measured_delta_mm=(dx, dy), raw_before=before, raw_after=self.position,
+                    absolute_target_sdk_mm=target, feedback_samples=self.position_sequence-sequence_before)
         raise RuntimeError(stage + ': endpoint did not settle; requested (%s, %s), measured (%s, %s) mm' % (x, y, dx, dy))
 
     def wait_ready(self, timeout=3, need_gripper=False):
@@ -212,6 +220,9 @@ class Pick:
                 raise RuntimeError(stage + ': segmented traverse requires safe height')
             step = MAX_COMMAND_MM if delta[0] > 0 else -MAX_COMMAND_MM
             self.goto(stage + '_segment_1', x=current[0] + step)
+            # Do not carry downward endpoint error into the next horizontal leg.
+            # Restore the configured safe height first; failure aborts segment 2.
+            self.goto(stage + '_restore_height', y=safe)
             self.goto(stage + '_segment_2', x=target[0])
         else:
             # Cap boundary corrections but retain the taught endpoint check.
@@ -221,7 +232,7 @@ class Pick:
         if max(abs(a - b) for a, b in zip(actual, target)) > POSITION_TOLERANCE_MM:
             raise RuntimeError(stage + ': taught endpoint error exceeds 2 mm')
 
-    def run(self, home_only=False):
+    def run(self, home_only=False, check_path=False):
         points = layout(self.cfg)
         home, place, safe = points['home'], points['place'], points['safe_y']
         current = self.relative_position()
@@ -242,7 +253,10 @@ class Pick:
         self.goto('approach_raise', y=safe)
         self.goto('approach_A', x=0)
         self.goto('descend_A', y=0)
-        self.jaws(False)
+        if check_path:
+            self.record('empty_path_skip_grip')
+        else:
+            self.jaws(False)
         self.goto('lift', y=safe)
         self.goto('transfer_B', x=place[0])
         self.goto('lower_B', y=place[1] + self.cfg['release_clearance_mm'])
@@ -275,7 +289,7 @@ def main():
     parser.add_argument('--config', type=Path, default=local_config if local_config.exists() else ROOT / 'config/real_pick.json')
     parser.add_argument('--connection', type=Path, default=ROOT / 'config/ep_connection.json')
     parser.add_argument('--execute', action='store_true', help='Run the full physical sequence; operator must be present')
-    parser.add_argument('--task', choices=['pick', 'home', 'release'], default='pick', help='Full cycle, empty HOME check, or supported-object release only')
+    parser.add_argument('--task', choices=['pick', 'home', 'release', 'check-path'], default='pick', help='Full cycle, empty HOME check, supported release, or empty full path with jaws open')
     parser.add_argument('--object-supported', action='store_true', help='For release only: bottle is on floor or securely supported by the operator')
     parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
     args = parser.parse_args()
@@ -368,10 +382,11 @@ def main():
             if args.task == 'release':
                 task.jaws(True, 'supported_release')
             else:
-                task.run(home_only=args.task == 'home')
+                task.run(home_only=args.task == 'home', check_path=args.task == 'check-path')
             report['commands_completed'] = True
             notices = {'release': 'Gripper opened; no arm move requested',
                        'home': 'HOME command complete; verify physical pose',
+                       'check-path': 'Empty path complete; no close command sent; does not prove loaded grasp success',
                        'pick': 'Returned HOME; operator must verify bottle lifted, placed upright and undamaged'}
             record('commands_complete', notice=notices[args.task])
     except (Exception, KeyboardInterrupt) as error:
