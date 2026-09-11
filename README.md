@@ -8,7 +8,7 @@
 
 ## 真机准备：通信检查
 
-新增 [真机抓放调试入口](docs/real-pick.md)：`bash scripts/run_real.sh` 预览，添加 `--execute` 执行一次从当前夹爪位置开始的抓放。此入口直接使用 SDK，尚未实现完整 ROS 2 真机接口或回零；原有仿真不变。首次启动遇到 EP 连接超时，尚未验证抓取成功。
+[真机完整流程入口](docs/real-pick.md)：先用 `bash scripts/run_real.sh --teach home/pick/place/safe` 分别记录四个位置（每次选择一个名称），再用 `bash scripts/run_real.sh` 预览、添加 `--execute` 执行“回 HOME → A 抓取 → B 松爪放置 → 返回 HOME”。无标定时拒绝运动；参数自动保存到本地 `config/real_pick.local.json`。此入口直接使用 SDK，尚未接入共用 ROS 2 真机接口；原有仿真不变，完整实机流程尚未验证。
 
 Jetson 连接 EP 热点后执行 `python3 scripts/check_ep_connection.py`。仅检查 SDK 通信、版本和机械臂位置反馈，不发送运动命令；结果保存到 `work/ep-connection.json`。操作、已发现的坐标解码异常及下一步见 [真机连接说明](docs/real-connection.md)。
 

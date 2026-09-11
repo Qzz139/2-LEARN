@@ -1,37 +1,76 @@
-# 真机抓放：从瓶子已在夹爪内开始
+# 真机完整流程：HOME → A 抓取 → B 放置 → 返回 HOME
 
-这是独立的 SDK 实机调试入口，不替换仿真 `pick_demo.py`。目前还不是课程要求的完整 ROS 2 / MoveIt 真机适配，也没有自动回零、寻找瓶子或五次循环。
+主控程序是 `scripts/pick_real.py`，启动入口是 `scripts/run_real.sh`。仿真 `pick_demo.py` 保持不变。本入口直接调用 DJI SDK，尚未接入课程要求的共用 ROS 2 轨迹接口；完成动作顺序不代表整个课程验收已完成。
 
-## 启动
+## 完整动作顺序
 
-EP 开机，Jetson 连接 EP 热点，保留有线 SSH；退出其他控制 EP 的程序。瓶子含 150 ml 水、竖直放稳地面且位于张开的两爪之间，活动范围内无手和障碍物，现场人员能立即停止供电。
+张开夹爪 → 升到安全高度 → 移到 HOME → 升到安全高度并移到 A 上方 → 下降到 A → 夹持 → 升到安全高度 → 移到 B 上方 → 下降到 B 上方的释放间隙 → 张开夹爪 → 确认新收到的 `opened` 状态 → 抬升撤离 → 返回 HOME。
+
+HOME 是现场记录的安全初始姿态，不是 SDK `(0,0)`，也不是寻找机械零点。横向移动前先抬升，各段只移动一个方向；失败时停止后续动作，不盲目回零或松爪。
+
+## 第一次使用：记录四个位置
+
+Jetson 连接 EP 热点，并通过有线 SSH 操作。配置模板为 `config/real_pick.json`，四个位置初始为空，故第一次直接执行会拒绝运动。
+
+使用已能正常工作的人工控制方式（例如 DJI 控制界面）将机械臂移到下述位置，停止手动控制并释放其他 SDK 连接后，逐条执行对应命令。**不要用手扳动通电的机械臂。`--teach` 只记录当时的位置，不会帮你移动到该位置。**记录位置时保持底盘不动、机器人不断电；重新上电、重新安装或位置原点变化后重新记录。
 
 ```bash
 cd /home/robot/projects/2-LEARN
-nmcli device status
-bash scripts/run_real.sh
+
+# 1. 空夹爪位于安全、无障碍的初始姿态时
+bash scripts/run_real.sh --teach home
+
+# 2. 夹爪对准地面瓶子的正确夹持位置，但尚未夹紧时
+bash scripts/run_real.sh --teach pick
+
+# 3. 空夹爪移到 B 点的对应夹持高度时
+# 同一平地上，B 点高度应与 A 点相同；用户目标为向车头前方 30 mm
+bash scripts/run_real.sh --teach place
+
+# 4. 夹爪处于能沿 A/B/HOME 横向安全通过的高度时
+bash scripts/run_real.sh --teach safe
 ```
 
-上面最后一条只预览，不连接 EP。确认摆放、参数及现场状态后执行一次：
+不要携带悬空瓶子做位置记录。确认夹爪、瓶子、机械臂、车体及地面之间的整个通路；本入口没有碰撞规划。安全高度必须不低于 HOME、A 和 B 的释放高度，且在本次小范围调试的 60 mm 垂直跨度内。
+
+记录自动保存在 `config/real_pick.local.json`，后续命令优先读取它。此文件及备份不提交 Git，避免同步代码时覆盖实机标定；模板仍保留为空。需要保存课程提交参数时，现场确认后另行归档本地参数。记录失败不会写入假位置；更新时保留 `.bak`。换配置可显式传 `--config 路径`。
+
+## 预览与执行
 
 ```bash
-timeout -k 5s 60s bash scripts/run_real.sh --execute
+cd /home/robot/projects/2-LEARN
+
+# 不连接、不运动；显示四个位置相对 A 的毫米坐标
+bash scripts/run_real.sh
+
+# 修改夹爪设置、释放间隙等；已有坐标优先使用 teach 更新
+nano config/real_pick.local.json
+
+# 瓶子立在 A 点、手和障碍物移开、现场人员准备停止供电后
+# 执行一次完整流程
+bash scripts/run_real.sh --execute
 ```
 
-默认动作：以 SDK 出力设置 25 夹持 1.5 秒后暂停夹爪电机，抬升 20 mm，向车头前方移动 30 mm，下降 17 mm，张开夹爪 1.5 秒并暂停。没有夹爪力传感器，出力参数不是经过标定的牛顿值；150 ml 仅为水量，不是测得的总质量。
+首次完整运行请在本地 SSH 终端观察，Ctrl+C 请求停止，不使用只适合旧短流程的固定 60 秒总时限。程序对每段动作单独设置超时。
 
-主控文件：`scripts/pick_real.py`；启动脚本：`scripts/run_real.sh`；参数：`config/real_pick.json`。可用 `nano config/real_pick.json` 修改参数。`lift_mm` 是相对抬升，`forward_mm` 是沿车头前进方向的相对位移，`release_clearance_mm` 是按机械臂位移计算的松爪间隙。存在夹持滑移时，该间隙不等于真实瓶底高度。
+每次结果单独保存为 `work/real-pick-时间戳.json`，包含阶段、动作状态和实测相对位移。`returned_home` 表示完成返回；`commands_completed` 只表示命令和机械臂反馈通过，`physical_grasp_success` 仍需现场确认，不能用电机成功回执冒充瓶子抓取成功。
 
-每次结果独立保存于 `work/real-pick-时间戳.json`。`commands_completed` 只表示指令和机械臂相对反馈通过；`physical_grasp_success` 初始为 null，必须由现场观察瓶子是否真正离地、放稳、无损来评价。SDK 等待结束不一定代表动作成功，因此程序还检查 `has_succeeded`。
+每轮都要由现场人员将瓶子重新放回 A 点后再执行；程序不会自动把 B 点瓶子复位，亦不会自动循环。
 
-## 失败和停止
+## 参数与边界
 
-程序不自动重试、回位或松爪。动作失败或 Ctrl+C 时会尝试向设备发出取消请求，并暂停夹爪；这个停止路径尚未在实机验证，不等于硬件急停。若运动异常或持续挤压，应由现场人员立即停止供电。外层 timeout 只限制程序运行时间，不能保证设备立即停住。
+- 用户目标瓶装水 150 ml；总质量尚未称重，不能当作恰好 150 g。
+- 默认夹爪 SDK 出力为 25、开合持续 1.5 秒。出力不是标定过的牛顿值；张开后必须收到新的 `opened` 反馈，否则不继续抬升或返回。夹持时不要求 `closed`，因为瓶子会阻止夹爪完全闭合。
+- 默认 B 点释放间隙为 3 mm；若发生夹持滑移，它不等于真实瓶底间隙。无瓶子位姿传感器，现场须观察瓶子是否离地、放稳、打滑或变形。
+- 用 SDK 原始位置之间的 32 位模运算计算相对位移，保留原始记录，不把无符号大整数当作物理高度；没有解决绝对坐标到地面的标定问题。
+- 布局相对 A 限制在 ±60 mm，单段位移不超过 60 mm；这些是本入口的小范围限制，不是完整机械臂关节限位或可达性证明。
+- 当前姿态超出已记录区域、反馈过期、执行失败、位置误差超过 5 mm，均停止后续流程。返回目标由实时反馈重新计算，不简单累加正反位移。
+- Ctrl+C/失败时尝试发送设备取消请求并暂停夹爪，不自动张开或返回；取消尚未通过实机验收，不代替现场停止供电。
 
-原始位置订阅存在无符号解析问题；本程序只用 32 位模运算比较运动前后的相对位移，不把异常原始值用作绝对目标。相对反馈误差超过 5 mm 时停止后续动作。数值边界只是本次小范围调试限制，不是完整的关节限位和碰撞规划。
+## 验证状态
 
-三项假设备测试通过：有符号跨界时的相对位移、完整动作顺序、失败后不继续搬运/下降/松爪。
+八项假设备测试通过：完整流程、先释放再撤离并返回 HOME、失败不继续、未张开不返回、起点异常不运动、缺少标定不执行、不安全高度拒绝、从 HOME 再次启动，以及测试中的无符号跨界位移检查（总计八个测试方法）。本次只做程序验证和部署，没有执行新的实机运动。
 
-2026-09-11 首次运行在 SDK 建立连接阶段超时，没有发送夹持或移动命令。此次不计为抓取成功；记录见 [首次启动结果](validation/real/first-pick-attempt.json)。
+历史短流程首次启动连接超时，未发送抓取命令，见 [历史启动记录](validation/real/first-pick-attempt.json)。本版完整流程的实机抓取成功率尚未验证。
 
-协议参考：[官方 SDK 夹爪接口](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/gripper.py)、[官方动作状态实现](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/action.py)。取消请求字段的用法参考已有模型来源 [jeguzzi/robomaster_ros](https://github.com/jeguzzi/robomaster_ros/blob/c05a39d7f0fa8b3b277aa74826aa92e202efc987/robomaster_ros/robomaster_ros/action.py)。
+参考：[官方 SDK 夹爪接口](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/gripper.py)、[官方动作状态实现](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/action.py)、[既有 ROS 驱动取消请求方法](https://github.com/jeguzzi/robomaster_ros/blob/c05a39d7f0fa8b3b277aa74826aa92e202efc987/robomaster_ros/robomaster_ros/action.py)。

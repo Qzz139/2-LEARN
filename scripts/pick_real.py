@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Supervised SDK bring-up: bottle starts between open jaws, resting on floor.
+"""Supervised taught HOME -> pick A -> place B -> HOME sequence.
 
-No homing, chassis motion, repeated trials or automatic failure recovery.
-This entry does not yet implement the course's ROS 2 trajectory interface.
+HOME is a taught pose, not a mechanical origin search or SDK recenter command.
+This SDK entry does not yet implement the course's ROS 2 trajectory interface.
 """
 import argparse
 from datetime import datetime, timezone
@@ -17,9 +17,9 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_task(path):
+def load_task(path, require_calibration=False):
     cfg = json.loads(Path(path).read_text())
-    limits = {'water_ml': (0, 150), 'lift_mm': (5, 30), 'forward_mm': (0, 30),
+    limits = {'water_ml': (0, 150),
               'release_clearance_mm': (2, 5), 'grip_power': (1, 30),
               'open_power': (1, 30), 'grip_seconds': (0.2, 2),
               'open_seconds': (0.2, 2), 'action_timeout_s': (3, 15)}
@@ -31,8 +31,18 @@ def load_task(path):
             if value != int(value):
                 raise ValueError(key + ' must be an integer')
             cfg[key] = int(value)
-    if cfg['release_clearance_mm'] >= cfg['lift_mm']:
-        raise ValueError('Release clearance must be smaller than lift')
+    for key in ('home_raw_sdk_mm', 'pick_raw_sdk_mm', 'place_raw_sdk_mm'):
+        point = cfg.get(key)
+        if point is not None:
+            if not isinstance(point, list) or len(point) != 2:
+                raise ValueError(key + ' must contain exactly two SDK readings')
+            if any(isinstance(v, bool) or not isinstance(v, int) or not -2**31 <= v < 2**32 for v in point):
+                raise ValueError(key + ' contains an invalid SDK integer')
+    height = cfg.get('safe_y_raw_sdk_mm')
+    if height is not None and (isinstance(height, bool) or not isinstance(height, int) or not -2**31 <= height < 2**32):
+        raise ValueError('safe_y_raw_sdk_mm must be an SDK integer')
+    if require_calibration:
+        layout(cfg)
     return cfg
 
 
@@ -41,12 +51,37 @@ def modular_delta(new, old):
     return tuple((int(a) - int(b) + 2**31) % 2**32 - 2**31 for a, b in zip(new, old))
 
 
+def layout(cfg):
+    required = ('home_raw_sdk_mm', 'pick_raw_sdk_mm', 'place_raw_sdk_mm', 'safe_y_raw_sdk_mm')
+    missing = [key for key in required if cfg.get(key) is None]
+    if missing:
+        raise ValueError('Missing taught poses: ' + ', '.join(missing) + '; use --teach home/pick/place/safe')
+    anchor = cfg['pick_raw_sdk_mm']
+    home = modular_delta(cfg['home_raw_sdk_mm'], anchor)
+    place = modular_delta(cfg['place_raw_sdk_mm'], anchor)
+    safe = modular_delta((anchor[0], cfg['safe_y_raw_sdk_mm']), anchor)[1]
+    clearance = cfg['release_clearance_mm']
+    if max(abs(v) for v in home + place) > 60 or not 5 <= safe <= 60:
+        raise ValueError('Taught layout exceeds the 60 mm local workspace')
+    if max(home[0], place[0], 0) - min(home[0], place[0], 0) > 60:
+        raise ValueError('Horizontal span exceeds 60 mm')
+    if safe < max(home[1], place[1] + clearance, 0) or safe - min(home[1], place[1], 0) > 60:
+        raise ValueError('Safe height must be above HOME, A and the release pose, within 60 mm vertical span')
+    return {'home': home, 'pick': (0, 0), 'place': place, 'safe_y': safe}
+
+
 class Pick:
     def __init__(self, bot, cfg, record):
         self.bot, self.cfg, self.record = bot, cfg, record
         self.position = None
         self.position_time = 0
         self.active = None
+        self.gripper_status = None
+        self.gripper_status_time = 0
+
+    def gripper_feedback(self, status):
+        self.gripper_status = status
+        self.gripper_status_time = time.monotonic()
 
     def feedback(self, value):
         if len(value) == 2 and all(isinstance(v, (int, float)) and math.isfinite(v) and v == int(v) for v in value):
@@ -74,26 +109,67 @@ class Pick:
         if abs(dx - x) > 5 or abs(dy - y) > 5:
             raise RuntimeError(stage + ': arm displacement differs from request by more than 5 mm')
 
-    def jaws(self, opening):
-        stage = 'release' if opening else 'grip'
+    def jaws(self, opening, stage=None):
+        stage = stage or ('release' if opening else 'grip')
         power = self.cfg['open_power' if opening else 'grip_power']
         self.record(stage + '_request', power=power)
         command = self.bot.gripper.open if opening else self.bot.gripper.close
+        requested_at = time.monotonic()
         if not command(power=power):
             raise RuntimeError(stage + ': gripper rejected command')
         time.sleep(self.cfg['open_seconds' if opening else 'grip_seconds'])
         if not self.bot.gripper.pause():
             raise RuntimeError(stage + ': gripper pause not acknowledged')
+        if opening and (self.gripper_status != 'opened' or
+                        self.gripper_status_time < requested_at or
+                        time.monotonic() - self.gripper_status_time > 1):
+            raise RuntimeError(stage + ': fresh fully-open gripper feedback not received; no return motion')
         self.record(stage + '_command_complete')
 
+    def relative_position(self):
+        return modular_delta(self.fresh_position(), self.cfg['pick_raw_sdk_mm'])
+
+    def goto(self, stage, x=None, y=None):
+        current = self.relative_position()
+        target = (current[0] if x is None else x, current[1] if y is None else y)
+        delta = (target[0] - current[0], target[1] - current[1])
+        if any(abs(v) > 60 for v in delta) or (delta[0] and delta[1]):
+            raise RuntimeError('Unsafe leg: require one axis at a time and at most 60 mm')
+        if delta == (0, 0):
+            self.record(stage + '_already_at_target', target_mm=target)
+            return
+        self.move(stage, *delta)
+        actual = self.relative_position()
+        if max(abs(a - b) for a, b in zip(actual, target)) > 5:
+            raise RuntimeError(stage + ': taught endpoint error exceeds 5 mm')
+
     def run(self):
-        self.fresh_position()
+        points = layout(self.cfg)
+        home, place, safe = points['home'], points['place'], points['safe_y']
+        current = self.relative_position()
+        # Reject an unexpected startup pose before any jaw or arm command.
+        xmin, xmax = min(home[0], place[0], 0), max(home[0], place[0], 0)
+        ymin = min(home[1], place[1], 0)
+        if not xmin - 5 <= current[0] <= xmax + 5 or not ymin - 5 <= current[1] <= safe + 5:
+            raise RuntimeError('Startup pose outside taught area; no automatic homing')
+        self.record('preflight', current_relative_to_A_mm=current, taught_layout=points)
+        # Start empty. Bottle may be between the jaws but must rest on the floor.
+        self.jaws(True, 'open_before_home')
+        self.goto('home_raise', y=safe)
+        self.goto('home_traverse', x=home[0])
+        self.goto('home', y=home[1])
+        self.goto('approach_raise', y=safe)
+        self.goto('approach_A', x=0)
+        self.goto('descend_A', y=0)
         self.jaws(False)
-        self.move('lift', 0, self.cfg['lift_mm'])
-        if self.cfg['forward_mm']:
-            self.move('transfer', self.cfg['forward_mm'], 0)
-        self.move('lower', 0, -(self.cfg['lift_mm'] - self.cfg['release_clearance_mm']))
-        self.jaws(True)
+        self.goto('lift', y=safe)
+        self.goto('transfer_B', x=place[0])
+        self.goto('lower_B', y=place[1] + self.cfg['release_clearance_mm'])
+        self.jaws(True, 'release_at_B')
+        self.goto('withdraw_B', y=safe)
+        self.goto('return_traverse', x=home[0])
+        self.goto('return_HOME', y=home[1])
+        self.record('returned_home', relative_to_A_mm=self.relative_position())
 
     def stop_requests(self):
         # Request device cancellation, not SDK Action._abort(), which is local-only.
@@ -114,15 +190,26 @@ class Pick:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=ROOT / 'config/real_pick.json')
+    local_config = ROOT / 'config/real_pick.local.json'
+    parser.add_argument('--config', type=Path, default=local_config if local_config.exists() else ROOT / 'config/real_pick.json')
     parser.add_argument('--connection', type=Path, default=ROOT / 'config/ep_connection.json')
-    parser.add_argument('--execute', action='store_true', help='Send physical commands; operator must be present')
+    parser.add_argument('--execute', action='store_true', help='Run the full physical sequence; operator must be present')
+    parser.add_argument('--teach', choices=['home', 'pick', 'place', 'safe'], help='Read current arm pose into the task configuration; no movement')
     args = parser.parse_args()
-    cfg = load_task(args.config)
-    if not args.execute:
-        print('预览，不连接机器人。瓶子须已在张开的夹爪之间、放稳地面。')
+    if args.teach and args.execute:
+        parser.error('--teach and --execute cannot be combined')
+    try:
+        cfg = load_task(args.config, require_calibration=args.execute)
+    except (ValueError, KeyError) as error:
+        parser.error(str(error))
+    if not args.execute and not args.teach:
+        print('预览，不连接机器人。HOME/A/B/安全高度均须记录并核对通路。')
         print(json.dumps(cfg, indent=2))
-        print('夹持 → 抬升 → 前移 → 下降并留间隙 → 松爪。执行需加 --execute。')
+        print('回HOME → A上方 → 下降夹取 → 抬升 → B放置 → 撤离 → 返回HOME。执行需加 --execute。')
+        try:
+            print('已记录布局（相对A，毫米）:', layout(cfg))
+        except ValueError as error:
+            print('待标定:', error)
         return 0
     from check_ep_connection import load_config
     connection = load_config(args.connection)
@@ -140,10 +227,14 @@ def main():
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     output = work / ('real-pick-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ') + '.json')
     report = {'commands_completed': False, 'physical_grasp_success': None,
-              'config': cfg, 'events': [], 'operator_observation_required': True}
+              'config': cfg, 'events': [], 'operator_observation_required': True,
+              'mode': 'teach_' + args.teach if args.teach else 'full_pick',
+              'motion_commands_sent': False, 'teach_completed': False}
 
     def record(stage, **data):
         item = dict(stage=stage, time_utc=datetime.now(timezone.utc).isoformat(), **data)
+        if stage.endswith('_request') and any(k in data for k in ('relative_x_mm', 'power')):
+            report['motion_commands_sent'] = True
         report['events'].append(item)
         output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
         print(json.dumps(item, ensure_ascii=False), flush=True)
@@ -152,7 +243,7 @@ def main():
         raise KeyboardInterrupt('Operator or process supervisor requested stop')
 
     signal.signal(signal.SIGTERM, interrupted)
-    bot, task, subscribed = robot.Robot(), None, False
+    bot, task, subscribed, gripper_subscribed = robot.Robot(), None, False, False
     record('starting')
     try:
         if not bot.initialize(conn_type='ap', proto_type='udp'):
@@ -161,25 +252,54 @@ def main():
         subscribed = bool(bot.robotic_arm.sub_position(freq=5, callback=task.feedback))
         if not subscribed:
             raise RuntimeError('Arm feedback subscription failed')
+        if not args.teach:
+            gripper_subscribed = bool(bot.gripper.sub_status(freq=5, callback=task.gripper_feedback))
+            if not gripper_subscribed:
+                raise RuntimeError('Gripper status subscription failed')
         time.sleep(0.6)
-        task.run()
-        report['commands_completed'] = True
-        record('commands_complete', notice='Operator must verify bottle lifted, placed upright and undamaged')
+        if args.teach:
+            first = task.fresh_position()
+            time.sleep(0.6)
+            raw = task.fresh_position()
+            if max(abs(v) for v in modular_delta(raw, first)) > 2:
+                raise RuntimeError('Arm moved while teaching; configuration was not saved')
+            key = 'safe_y_raw_sdk_mm' if args.teach == 'safe' else args.teach + '_raw_sdk_mm'
+            # Preserve other fields and leave a backup before changing taught points.
+            saved = json.loads(args.config.read_text())
+            destination = local_config if args.config.resolve() == (ROOT / 'config/real_pick.json').resolve() else args.config
+            backup = destination.with_name(destination.name + '.bak')
+            if destination.exists():
+                backup.write_text(destination.read_text())
+            saved[key] = int(raw[1]) if args.teach == 'safe' else [int(v) for v in raw]
+            temporary = destination.with_name(destination.name + '.tmp')
+            temporary.write_text(json.dumps(saved, ensure_ascii=False, indent=2) + '\n')
+            temporary.replace(destination)
+            report['teach_completed'] = True
+            record('pose_saved', point=args.teach, raw_sdk_mm=raw, config_path=str(destination))
+        else:
+            task.run()
+            report['commands_completed'] = True
+            record('commands_complete', notice='Returned HOME; operator must verify bottle lifted, placed upright and undamaged')
     except (Exception, KeyboardInterrupt) as error:
         report['error'] = str(error)
         record('stopped', notice='No automatic return or release. Cut power if motion continues.')
-        if task:
+        if task and not args.teach and report['motion_commands_sent']:
             task.stop_requests()
     finally:
-        try:
-            if subscribed:
-                bot.robotic_arm.unsub_position()
-            bot.close()
-        except Exception as error:
-            record('cleanup_error', error=str(error))
+        cleanup = []
+        if gripper_subscribed:
+            cleanup.append(bot.gripper.unsub_status)
+        if subscribed:
+            cleanup.append(bot.robotic_arm.unsub_position)
+        cleanup.append(bot.close)
+        for close_resource in cleanup:
+            try:
+                close_resource()
+            except Exception as error:
+                record('cleanup_error', error=str(error))
         record('finished')
         print('结果文件:', output, flush=True)
-    return 0 if report['commands_completed'] else 1
+    return 0 if report['commands_completed'] or report['teach_completed'] else 1
 
 
 if __name__ == '__main__':

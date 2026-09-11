@@ -11,3 +11,8 @@ __pycache__/
 .vscode/
 
 ._*
+config/real_pick.json.bak
+config/real_pick.json.tmp
+config/real_pick.local.json
+config/real_pick.local.json.bak
+config/real_pick.local.json.tmp

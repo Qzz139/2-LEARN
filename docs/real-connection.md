@@ -44,6 +44,6 @@ python3 scripts/check_ep_connection.py
 
 用户已确认机械臂、夹爪原装，照片中的黄色部分为胶带。2026-09-11 的最终交叉核对仍读到 x=159、y=4294967293，但独立位置查询超时；因此位置检查继续保持失败，未发送运动命令。记录见 [交叉核对结果](validation/real/signed-position-check.json)。六项假设备测试通过，包含查询一致与不一致两种情况。按用户要求控制工作量，不继续重复实机试验。
 
-后续新增了使用相对运动的 [SDK 真机抓放调试入口](real-pick.md)，不依赖绝对坐标解码；首次运行连接超时，尚未验证抓取。现有 `pick_demo.py` 和仿真启动入口未修改；完整坐标标定、共享任务流程重构、ROS 2 真机轨迹接口仍未实现。
+后续新增了按记录位姿执行 HOME→A→B→HOME 的 [SDK 真机完整流程入口](real-pick.md)，使用原始反馈之间的相对位移；尚待记录实机位置和验证抓取。现有 `pick_demo.py` 和仿真启动入口未修改；完整坐标标定、共享任务流程重构、ROS 2 真机轨迹接口仍未实现。
 
 参考：[官方 SDK 入门与查询接口](https://robomaster-dev.readthedocs.io/en/latest/python_sdk/beginner_ep.html)、[官方机械臂反馈解码实现](https://github.com/dji-sdk/RoboMaster-SDK/blob/master/src/robomaster/robotic_arm.py)。
