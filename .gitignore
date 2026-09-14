@@ -16,3 +16,7 @@ config/real_pick.json.tmp
 config/real_pick.local.json
 config/real_pick.local.json.bak
 config/real_pick.local.json.tmp
+
+# Personal report: local files only, excluded from course submission.
+docs/report/individual-reflection.html
+output/pdf/Xuanye_Xu_Individual_Report.pdf
