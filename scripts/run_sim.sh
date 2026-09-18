@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 启动完整仿真；独立 ROS 域和本地 Gazebo 地址用于隔离会话。
 set -eo pipefail
 cd "$(dirname "$0")/.."
 source /opt/ros/foxy/setup.bash

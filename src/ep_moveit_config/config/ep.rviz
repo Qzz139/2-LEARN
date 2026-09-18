@@ -1,3 +1,4 @@
+# 仿真可视化预设，供 sim.launch.py 启动 RViz 时加载。
 Panels:
   - Class: rviz_common/Displays
     Name: Displays

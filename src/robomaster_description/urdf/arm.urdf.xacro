@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 机械臂连杆、关节和原始联动关系；仿真树的进一步适配见 ep_simulation/model.py。 位移单位为米，角度为弧度。 -->
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 
   <xacro:macro name="arm" params="tf_prefix=''">

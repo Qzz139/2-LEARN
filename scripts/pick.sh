@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 加载已构建工作区，在本机 ROS 域中运行仿真取放任务；原样传递命令行参数。
 set -eo pipefail
 cd "$(dirname "$0")/.."
 source /opt/ros/foxy/setup.bash

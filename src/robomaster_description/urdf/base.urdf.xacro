@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 底盘组件及安装关系，复用车轮和装甲灯宏。 位移单位为米，角度为弧度。 -->
 
   <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 

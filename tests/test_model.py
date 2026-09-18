@@ -1,3 +1,4 @@
+# 检查瓶子配置、正逆运动学和 URDF 拓扑；URDF 测试需要 xacro。
 """Run after building: python3 -m unittest discover -s tests -v."""
 import math
 from pathlib import Path
@@ -44,6 +45,7 @@ class WorkspaceTests(unittest.TestCase):
 
 
 class URDFTests(unittest.TestCase):
+    # 展开实际 Xacro，再对适配后的 XML 检查拓扑与运动学一致性。
     @classmethod
     def setUpClass(cls):
         try:

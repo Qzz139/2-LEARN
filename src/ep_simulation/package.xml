@@ -1,4 +1,5 @@
 <?xml version="1.0" ?>
+<!-- 声明 ep_simulation 的 ROS 包元数据、构建方式与依赖，供依赖解析和包索引使用。 -->
 <package format="3">
   <name>ep_simulation</name>
   <version>0.1.0</version>

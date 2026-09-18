@@ -1,3 +1,4 @@
+# 构建 Gazebo 位置伺服共享库，并向 pluginlib 注册硬件插件。
 cmake_minimum_required(VERSION 3.5)
 project(ep_gazebo_control)
 find_package(ament_cmake REQUIRED)

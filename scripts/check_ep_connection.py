@@ -19,6 +19,7 @@ import threading
 ROOT = Path(__file__).resolve().parent.parent
 
 
+# 校验 IPv4 地址与超时预算，为连接和清理至少预留 10 秒。
 def load_config(path):
     cfg = json.loads(Path(path).read_text())
     for key in ('robot_ip', 'local_ip'):
@@ -34,6 +35,7 @@ def load_config(path):
     return cfg
 
 
+# 独立读取有符号坐标，用于交叉核对旧 SDK 的无符号订阅值。
 def query_signed_position(bot):
     """SDK 0.1.1.62 has this query protocol but no public arm query method.
 
@@ -52,12 +54,14 @@ def query_signed_position(bot):
     return {'x_mm': float(data._x), 'y_mm': float(data._y)}
 
 
+# 等待两帧有效反馈，记录失败阶段，并确保退出时关闭 SDK。
 def observe(bot, timeout, report, query_position=None):
     """Only initialize/query/subscribe/unsubscribe/close; injectable for tests."""
     subscribed = False
     samples = []
     ready = threading.Event()
 
+    # 丢弃非法或非有限坐标，收到两帧后唤醒等待线程。
     def receive(position):
         try:
             x, y = map(float, position)
@@ -119,6 +123,7 @@ def observe(bot, timeout, report, query_position=None):
             bot.close()
 
 
+# 选择本机网络接口后执行只读通信检查。
 def probe(cfg, report):
     report['stage'] = 'sdk_import'
     from robomaster import config, robot, version
@@ -136,6 +141,7 @@ def probe(cfg, report):
     observe(robot.Robot(), cfg['position_timeout_s'], report, query_position=query_signed_position)
 
 
+# 父进程限制 SDK 总运行时间，子进程把检查结果写入 JSON。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=ROOT / 'config/ep_connection.json')

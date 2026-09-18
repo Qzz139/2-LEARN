@@ -1,3 +1,4 @@
+# 使用假 SDK 和可控时钟检查运动顺序、反馈超时、分段横移及失败中止。
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ pick = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pick)
 
 
+# 提供包含 uint32 回绕坐标的示教样例，检查负坐标的相对位移计算。
 def taught_config():
     cfg = pick.load_task(ROOT / 'config/real_pick.json')
     cfg.update(home_raw_sdk_mm=[139, 17], pick_raw_sdk_mm=[159, 4294967293],
@@ -23,6 +25,7 @@ class RealPickTests(unittest.TestCase):
     def test_relative_delta_across_unsigned_wrap(self):
         self.assertEqual(pick.modular_delta((159, 17), (159, 4294967293)), (0, 20))
 
+    # 记录假设备命令，用可控时钟持续注入反馈，并允许指定阶段失败。
     def exercise(self, fail_at=None, start=(159, 4294967293), release_feedback=True, home_only=False, cfg=None, check_path=False):
         calls, stages = [], []
         cfg = taught_config() if cfg is None else cfg
@@ -200,6 +203,7 @@ class RealPickTests(unittest.TestCase):
     def test_sdk_success_with_fresh_unchanged_feedback_still_fails(self):
         self.check_feedback_timing(delay=0.1, displacement=(0, 0), expected_error='endpoint did not settle', tolerance=3)
 
+    # 模拟应答与反馈到达时间不同，验证终点判断依赖新采样。
     def check_feedback_timing(self, delay, displacement=(20, 0), expected_error=None, tolerance=2):
         clock = [100.0]
         calls = []
@@ -249,6 +253,7 @@ class RealPickTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'position_tolerance_mm'):
                 pick.load_task(path)
 
+    # 模拟稳定的抬升不足，检查仅允许一次向上补偿及配置容差。
     def check_lift_shortfall(self, tolerance, expected):
         clock, calls = [100.0], []
         cfg = taught_config()

@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 上游多连杆夹爪模型；本项目仿真将其替换为平行夹爪代理。 位移单位为米，角度为弧度。 -->
 
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 

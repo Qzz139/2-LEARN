@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 摄像头网格与安装坐标，通过 mount 和 camera_yaw 参数指定安装方式。 位移单位为米，角度为弧度。 -->
 
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 

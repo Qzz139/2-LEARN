@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- S1 云台及发射器组件，供 S1 总装模型引用。 位移单位为米，角度为弧度。 -->
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 
   <xacro:macro name="gimbal" params="tf_prefix=''">

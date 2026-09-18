@@ -20,6 +20,7 @@ MAX_HORIZONTAL_SPAN_MM = 90  # Requested layout, not a hardware reachability lim
 MAX_COMMAND_MM = 60
 
 
+# 验证任务参数类型、单位和范围；执行运动前要求示教完整。
 def load_task(path, require_calibration=False):
     cfg = json.loads(Path(path).read_text())
     cfg.setdefault('position_tolerance_mm', POSITION_TOLERANCE_MM)
@@ -50,11 +51,13 @@ def load_task(path, require_calibration=False):
     return cfg
 
 
+# 按 32 位回绕计算相对位移，返回毫米值，不代表绝对坐标标定。
 def modular_delta(new, old):
     """Relative encoder displacement across uint32 wrap, not absolute calibration."""
     return tuple((int(a) - int(b) + 2**31) % 2**32 - 2**31 for a, b in zip(new, old))
 
 
+# 以 A 点为原点构建示教布局，验证跨度与安全高度。
 def layout(cfg):
     required = ('home_raw_sdk_mm', 'pick_raw_sdk_mm', 'place_raw_sdk_mm', 'safe_y_raw_sdk_mm')
     missing = [key for key in required if cfg.get(key) is None]
@@ -74,7 +77,9 @@ def layout(cfg):
     return {'home': home, 'pick': (0, 0), 'place': place, 'safe_y': safe}
 
 
+# 真机取放状态机：运动是否完成由 SDK 应答和新鲜位置反馈共同判断。
 class Pick:
+    # 保存设备、配置和日志回调，初始化反馈时间与序号。
     def __init__(self, bot, cfg, record):
         self.bot, self.cfg, self.record = bot, cfg, record
         self.tolerance = cfg.get("position_tolerance_mm", POSITION_TOLERANCE_MM)
@@ -87,21 +92,25 @@ class Pick:
         self.gripper_status = None
         self.gripper_status_time = 0
 
+    # 记录夹爪状态及接收时刻，避免把旧的打开状态当作本次结果。
     def gripper_feedback(self, status):
         self.gripper_status = status
         self.gripper_status_time = time.monotonic()
 
+    # 只接受整数毫米反馈，递增序号以区分命令前后的采样。
     def feedback(self, value):
         if len(value) == 2 and all(isinstance(v, (int, float)) and math.isfinite(v) and v == int(v) for v in value):
             self.position = tuple(value)
             self.position_time = time.monotonic()
             self.position_sequence += 1
 
+    # 超过一秒的反馈不再用于生成后续运动。
     def fresh_position(self):
         if self.position is None or time.monotonic() - self.position_time > 1:
             raise RuntimeError('Arm feedback missing or stale; subsequent motion stopped')
         return self.position
 
+    # 发送绝对终点命令，并等待实测位移在容差内持续稳定。
     def move(self, stage, x, y, allow_upward_correction=True):
         before = self.fresh_position()
         sequence_before = self.position_sequence
@@ -178,6 +187,7 @@ class Pick:
                     absolute_target_sdk_mm=target, feedback_samples=self.position_sequence-sequence_before)
         raise RuntimeError(stage + ': endpoint did not settle; requested (%s, %s), measured (%s, %s) mm' % (x, y, dx, dy))
 
+    # 启动前等待新鲜机械臂反馈，按任务需要同时等待夹爪反馈。
     def wait_ready(self, timeout=3, need_gripper=False):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -189,6 +199,7 @@ class Pick:
             time.sleep(0.05)
         raise RuntimeError('Startup feedback timeout: arm or gripper status missing; no motion sent')
 
+    # 限时驱动夹爪后暂停；释放还需本次命令之后的完全打开反馈。
     def jaws(self, opening, stage=None):
         stage = stage or ('release' if opening else 'grip')
         power = self.cfg['open_power' if opening else 'grip_power']
@@ -206,9 +217,11 @@ class Pick:
             raise RuntimeError(stage + ': fresh fully-open gripper feedback not received; no return motion')
         self.record(stage + '_command_complete')
 
+    # 将当前原始 SDK 坐标换算为相对示教 A 点的毫米坐标。
     def relative_position(self):
         return modular_delta(self.fresh_position(), self.cfg['pick_raw_sdk_mm'])
 
+    # 每次只移动一个轴；长横移拆段并在第二段前恢复安全高度。
     def goto(self, stage, x=None, y=None):
         current = self.relative_position()
         target = (current[0] if x is None else x, current[1] if y is None else y)
@@ -236,6 +249,7 @@ class Pick:
         if max(abs(a - b) for a, b in zip(actual, target)) > self.tolerance:
             raise RuntimeError(stage + ': taught endpoint error exceeds %s mm' % self.tolerance)
 
+    # 依次回 HOME、抓取、搬运、释放、返回；任一步异常立即中断。
     def run(self, home_only=False, check_path=False):
         points = layout(self.cfg)
         home, place, safe = points['home'], points['place'], points['safe_y']
@@ -271,6 +285,7 @@ class Pick:
         self.goto('return_HOME', y=home[1])
         self.record('returned_home', relative_to_A_mm=self.relative_position())
 
+    # 尽力发送设备取消和夹爪暂停请求，日志不将其视为已确认物理停止。
     def stop_requests(self):
         # Request device cancellation, not SDK Action._abort(), which is local-only.
         # Pattern documented by jeguzzi/robomaster_ros; physical stop is unverified.
@@ -288,6 +303,7 @@ class Pick:
             self.record('gripper_pause_error', error=str(error))
 
 
+# 默认只预览；显式示教或执行时才建立 SDK 连接。
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     local_config = ROOT / 'config/real_pick.local.json'

@@ -1,3 +1,4 @@
+# 通过假设备验证通信检查、坐标解码及清理过程，不连接真实机器人。
 """Verify the probe uses only communication/query methods and cleans up."""
 import importlib.util
 from pathlib import Path
@@ -8,6 +9,7 @@ probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
 
+# 只暴露通信检查所需接口，调用列表用于核对订阅和关闭顺序。
 class FakeRobot:
     def __init__(self, samples=(), connected=True):
         self.robotic_arm = self

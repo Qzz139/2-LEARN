@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 声明最多四组 ToF 传感器开关及安装位姿参数。 位移单位为米，角度为弧度。 -->
 
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 

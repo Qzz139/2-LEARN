@@ -9,8 +9,10 @@
 
 namespace ep_gazebo_control
 {
+// 以受限速度电机追踪位置目标，保留 Gazebo 接触与受力求解。
 class PositionServo : public gazebo_ros2_control::GazeboSystemInterface
 {
+  // 单轴反馈与命令缓存；source 为 -1 表示独立轴，否则索引其跟随源。
   struct Axis
   {
     gazebo::physics::JointPtr joint;
@@ -23,6 +25,7 @@ class PositionServo : public gazebo_ros2_control::GazeboSystemInterface
   std::vector<Axis> axes_;
 
 public:
+  // 绑定 Gazebo 关节，读取伺服参数，并检查 mimic 源先于跟随轴初始化。
   bool initSim(rclcpp::Node::SharedPtr & node, gazebo::physics::ModelPtr model,
     const hardware_interface::HardwareInfo & info, sdf::ElementPtr) override
   {
@@ -64,6 +67,7 @@ public:
   hardware_interface::return_type configure(const hardware_interface::HardwareInfo & info) override
   {return configure_default(info);}
 
+  // 导出实际位置、速度与力矩缓存，控制器通过这些地址读取反馈。
   std::vector<hardware_interface::StateInterface> export_state_interfaces() override
   {
     std::vector<hardware_interface::StateInterface> result;
@@ -75,6 +79,7 @@ public:
     return result;
   }
 
+  // 仅独立轴接收外部位置命令，跟随轴的目标在 write 中计算。
   std::vector<hardware_interface::CommandInterface> export_command_interfaces() override
   {
     std::vector<hardware_interface::CommandInterface> result;
@@ -87,6 +92,7 @@ public:
   hardware_interface::return_type start() override
   {status_ = hardware_interface::status::STARTED; return hardware_interface::return_type::OK;}
 
+  // 停止时将所有轴的速度目标清零。
   hardware_interface::return_type stop() override
   {
     for (auto & a : axes_) a.joint->SetParam("vel", 0, 0.0);
@@ -94,6 +100,7 @@ public:
     return hardware_interface::return_type::OK;
   }
 
+  // 每个控制周期从物理引擎读取状态，而非用命令值充当反馈。
   hardware_interface::return_type read() override
   {
     for (auto & a : axes_) {
@@ -104,6 +111,7 @@ public:
     return hardware_interface::return_type::OK;
   }
 
+  // 位置误差乘比例增益后限速；非有限目标或反馈使该轴速度目标为零。
   hardware_interface::return_type write() override
   {
     for (auto & a : axes_) {

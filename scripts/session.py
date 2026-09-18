@@ -12,6 +12,7 @@ root = Path(__file__).resolve().parent.parent
 state = root/'work/session.json'
 
 
+# Linux 下同时检查 PID 存在性和僵尸状态。
 def alive(pid):
     try:
         os.kill(pid, 0)
@@ -20,6 +21,7 @@ def alive(pid):
         return False
 
 
+# 通过本仓库的会话记录管理进程组，停止前核对命令与工作目录。
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['start', 'stop', 'status'])

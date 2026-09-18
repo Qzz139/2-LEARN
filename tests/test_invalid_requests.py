@@ -1,3 +1,4 @@
+# 在 ROS 环境中验证非法任务在发送动作之前失败，并输出拒绝原因。
 """Exercise task rejection before any ROS action client can submit a goal."""
 import importlib.util
 import json

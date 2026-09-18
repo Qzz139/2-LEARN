@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from .model import fk, ik, TOOL_OFFSET
 
 
+# 读取瓶子参数并提前验证尺寸、夹爪开口和所有任务端点可达性。
 def load_config(path=None):
     if path is None:
         from ament_index_python.packages import get_package_share_directory
@@ -31,6 +32,7 @@ def load_config(path=None):
     return cfg
 
 
+# 把夹取、抬升、搬运、放置与撤离位置转换为关节角。
 def targets(cfg):
     x, z, lift = cfg['pick_x_m'], cfg['grasp_height_m'], cfg['lift_height_m']
     px, pz = cfg['place_x_m'], z+cfg['release_clearance_m']
@@ -39,18 +41,22 @@ def targets(cfg):
             'place': ik(px, pz), 'retract': ik(px, z+lift)}
 
 
+# 瓶子原点位于几何中心，因此落地时中心高度为瓶高的一半。
 def bottle_start(cfg):
     return [cfg['pick_x_m'], TOOL_OFFSET[1], cfg['height_m']/2]
 
 
+# 目标点使用同一机械臂平面，固定底盘不提供横向搬运自由度。
 def bottle_goal(cfg):
     return [cfg['place_x_m'], TOOL_OFFSET[1], cfg['height_m']/2]
 
 
+# 按水密度约 1 g/ml，将装水量换算为 kg 并加上空瓶质量。
 def bottle_mass(cfg):
     return cfg['empty_mass_kg']+cfg['water_ml']/1000
 
 
+# 生成含重力、地面和刚体瓶子的 Gazebo 世界；标记仅用于显示。
 def world_sdf(cfg):
     x, y, z = bottle_start(cfg)
     h, r, mass, mu = cfg['height_m'], cfg['diameter_m']/2, bottle_mass(cfg), cfg['friction']
@@ -82,6 +88,7 @@ def world_sdf(cfg):
     </world></sdf>'''
 
 
+# 从适配后的 URDF 构建 MoveIt 分组、预设姿态和碰撞忽略对。
 def semantic(urdf):
     r = ET.fromstring(urdf)
     out = ET.Element('robot', name='ep_fixed_arm')

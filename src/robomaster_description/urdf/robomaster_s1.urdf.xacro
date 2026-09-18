@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- S1 总装入口：组合底盘、云台和传感器，并支持独立 TF 前缀。 位移单位为米，角度为弧度。 -->
 <robot name="robomaster_s1" xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 
   <xacro:arg name="name" default=""/>

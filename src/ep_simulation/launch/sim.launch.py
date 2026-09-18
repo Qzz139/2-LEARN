@@ -12,6 +12,7 @@ from ep_simulation.model import adapt
 from ep_simulation.scene import semantic, world_sdf, load_config
 
 
+# 启动时展开 Xacro，并为本次会话生成 URDF、SRDF 和世界文件。
 def setup(context):
     sim = Path(get_package_share_directory('ep_simulation'))
     desc = Path(get_package_share_directory('robomaster_description'))
@@ -80,6 +81,7 @@ def setup(context):
     return actions
 
 
+# 声明任务和可视化开关，延迟到上下文就绪后解析路径与参数。
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('run_task', default_value='false'),

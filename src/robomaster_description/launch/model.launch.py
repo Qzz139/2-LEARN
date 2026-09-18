@@ -22,6 +22,7 @@ for i in range(4):
     args_descriptions[f'tof_{i}_rpy'] = f"Orientation of ToF sensor #{i}"
 
 
+# 按车型定位 Xacro，将函数参数传入宏展开并返回机器人 XML。
 def urdf(name: str = '', model: str = 'ep',
          camera_yaw: float = 0.0,
          tof_0: bool = False, tof_0_parent: str = 'base_link',
@@ -47,6 +48,7 @@ def urdf(name: str = '', model: str = 'ep',
         return ''
 
 
+# 解析 Launch 替换项，再把生成的描述交给 TF 发布节点。
 def robot_state_publisher(context: LaunchContext,
                           **substitutions: launch.substitutions.LaunchConfiguration
                           ) -> List[Node]:
@@ -63,6 +65,7 @@ def robot_state_publisher(context: LaunchContext,
     return [node]
 
 
+# 根据 urdf 参数及默认值生成 Launch 参数，保持模型入口一致。
 def generate_launch_description() -> None:
     arguments = [
         launch.actions.DeclareLaunchArgument(

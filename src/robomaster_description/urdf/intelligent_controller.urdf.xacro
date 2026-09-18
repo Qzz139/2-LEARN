@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- 智能控制器与天线模型，通过 mount 接到指定父连杆。 位移单位为米，角度为弧度。 -->
 <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 
   <xacro:macro name="intelligent_controller" params="tf_prefix='' mount=''">

@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- EP 总装入口：组合底盘、机械臂、夹爪和传感器，name 用于生成 TF 前缀。 位移单位为米，角度为弧度。 -->
 <robot name="robomaster_ep" xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro">
 
   <xacro:arg name="name" default=""/>

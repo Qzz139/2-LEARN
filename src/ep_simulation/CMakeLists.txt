@@ -1,3 +1,4 @@
+# 安装仿真 Python 包、可执行节点、配置与 Launch 文件。
 cmake_minimum_required(VERSION 3.5)
 project(ep_simulation)
 find_package(ament_cmake REQUIRED)

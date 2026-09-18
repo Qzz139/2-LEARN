@@ -1,3 +1,4 @@
+# 仿真控制器以 100 Hz 更新；仅给独立关节发送位置命令，联动由硬件插件处理。
 controller_manager:
   ros__parameters:
     update_rate: 100

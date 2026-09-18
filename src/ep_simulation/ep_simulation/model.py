@@ -13,10 +13,12 @@ BASE_HEIGHT = 0.0  # Upstream wheel centers are 0.05 m above base_link.
 TOOL_OFFSET = (0.1056754, -0.000941, 0.1172202)
 
 
+# 统一将 XML 属性转为字符串，供模型构建函数复用。
 def element(parent, tag, **attrs):
     return ET.SubElement(parent, tag, {k: str(v) for k, v in attrs.items()})
 
 
+# 为代理连杆添加正对角惯量，默认值仅用于简化仿真。
 def inertial(link, mass=0.0001, diagonal=1e-7):
     i = element(link, 'inertial')
     element(i, 'mass', value=mass)
@@ -24,6 +26,7 @@ def inertial(link, mass=0.0001, diagonal=1e-7):
             ixy=0, ixz=0, iyz=0)
 
 
+# 创建父子关节，可附加 mimic 跟随关系。
 def joint(root, name, parent, child, kind='continuous', xyz='0 0 0',
           axis='0 1 0', mimic=None, multiplier=1):
     j = element(root, 'joint', name=name, type=kind)
@@ -38,6 +41,7 @@ def joint(root, name, parent, child, kind='continuous', xyz='0 0 0',
     return j
 
 
+# 将上游模型改为固定底盘、两轴机械臂和平行夹爪，接入仿真硬件插件。
 def adapt(xml, controllers):
     root = ET.fromstring(xml)
     root.set('name', 'ep_fixed_arm')
@@ -183,6 +187,7 @@ def adapt(xml, controllers):
     return ET.tostring(root, encoding='unicode')
 
 
+# 输入肩角及相对肘角（弧度），输出 world 系工具中心（米）。
 def fk(q):
     """Tool center in world, meters, derived from the retained mesh joint origins."""
     a, b = q
@@ -196,12 +201,14 @@ def fk(q):
             BASE_HEIGHT+0.03465+0.0906477+0.030741+z1+z2+0.0001815-0.039]
 
 
+# 除单关节限位外，还检查肩角与肘角之和对应的电机限位。
 def valid(q):
     a, b = q
     return (-0.274 <= a <= 1.384 and -1.21475 <= b <= 0.34732
             and -0.79936 <= a+b <= 1.73137)
 
 
+# 平面解析逆解：尝试两个肘部构型，只返回满足独立与耦合限位的解。
 def ik(x, z):
     """Planar position IK for this pinned geometry; reject unreachable targets."""
     if not all(math.isfinite(v) for v in [x, z]):

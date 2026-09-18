@@ -27,7 +27,9 @@ from ep_simulation.model import ARM_JOINTS, HOME, valid, fk, ik
 from ep_simulation.scene import load_config, targets, bottle_start, bottle_goal, bottle_mass
 
 
+# 协调 MoveIt 规划、轨迹执行和 Gazebo 瓶子实测验收。
 class Demo(Node):
+    # 创建状态订阅、规划场景服务和机械臂/夹爪执行客户端。
     def __init__(self, cfg):
         super().__init__('ep_pick_demo')
         self.cfg = cfg
@@ -42,9 +44,11 @@ class Demo(Node):
         self.events = []
         self.attached = False
 
+    # 缓存最新关节反馈，供终点与联动误差检查使用。
     def joints(self, msg):
         self.positions.update(zip(msg.name, msg.position))
 
+    # 等待异步响应时持续处理 ROS 回调，超时或服务异常向上传递。
     def wait(self, future, timeout=40):
         end = time.monotonic()+timeout
         while rclpy.ok() and not future.done() and time.monotonic() < end:
@@ -55,16 +59,19 @@ class Demo(Node):
             raise future.exception()
         return future.result()
 
+    # 等待物理系统稳定时仍处理反馈，避免阻塞状态更新。
     def pause(self, seconds):
         end = time.monotonic()+seconds
         while time.monotonic() < end:
             rclpy.spin_once(self, timeout_sec=0.05)
 
+    # 保存完整事件，但控制台省略体积较大的轨迹明细。
     def record(self, stage, **data):
         event = {'stage': stage, 'wall_time': time.time(), **data}
         self.events.append(event)
         print(json.dumps({k:v for k,v in event.items() if k != 'trajectory'}, ensure_ascii=False), flush=True)
 
+    # 在动作开始前等待服务、Action 和机械臂关节反馈。
     def ready(self):
         for client in [self.plan, self.scene, self.entity]:
             if not client.wait_for_service(timeout_sec=60):
@@ -76,10 +83,12 @@ class Demo(Node):
         if not all(j in self.positions for j in ARM_JOINTS):
             raise RuntimeError('No arm joint states received')
 
+    # 场景更新必须得到成功确认，失败时不继续规划。
     def apply_scene(self, req):
         if not self.wait(self.scene.call_async(req)).success:
             raise RuntimeError('Failed to update planning scene')
 
+    # 用瓶高与半径创建 world 系圆柱碰撞体。
     def bottle_collision(self, pose):
         obj = CollisionObject()
         obj.id = 'target_bottle'; obj.header.frame_id = 'world'; obj.operation = CollisionObject.ADD
@@ -88,6 +97,7 @@ class Demo(Node):
         obj.primitives.append(shape); obj.primitive_poses.append(pose)
         return obj
 
+    # 向 MoveIt 添加地面和当前瓶子，地面留出接触求解容差。
     def setup_scene(self):
         req = ApplyPlanningScene.Request(); req.scene.is_diff = True
         obj = CollisionObject()
@@ -101,6 +111,7 @@ class Demo(Node):
         req.scene.world.collision_objects.append(self.bottle_collision(self.bottle_pose()))
         self.apply_scene(req)
 
+    # 把观测瓶姿转换到工具坐标系，仅更新规划中的携带碰撞体。
     def attach_bottle(self):
         # Planning representation only: Gazebo still uses friction, never attachment.
         pose = self.bottle_pose()
@@ -123,6 +134,7 @@ class Demo(Node):
         self.apply_scene(req)
         self.attached = True
 
+    # 释放后移除附着体，并按 Gazebo 实测位置恢复世界碰撞体。
     def detach_bottle(self):
         req = ApplyPlanningScene.Request(); req.scene.is_diff = True
         remove = AttachedCollisionObject(); remove.link_name = 'tool_link'
@@ -133,6 +145,7 @@ class Demo(Node):
         self.apply_scene(req)
         self.attached = False
 
+    # 规划后逐路点检查耦合限位，执行后检查主动与被动关节误差。
     def arm(self, name, q):
         if not valid(q):
             raise ValueError('EP joint/motor limits exceeded')
@@ -194,6 +207,7 @@ class Demo(Node):
                          'time_from_start_s': p.time_from_start.sec+p.time_from_start.nanosec/1e9}
                         for p in trajectory.joint_trajectory.points]})
 
+    # 只控制左侧独立关节；开口参数为单侧半间距，右侧通过 mimic 跟随。
     def fingers(self, opening):
         goal=FollowJointTrajectory.Goal()
         goal.trajectory.joint_names=['left_finger_joint']
@@ -212,6 +226,7 @@ class Demo(Node):
         self.pause(0.7)
         self.record('gripper', commanded_half_gap=opening)
 
+    # 读取 world 系瓶姿并检查有限值与四元数归一化。
     def bottle_pose(self):
         req=GetEntityState.Request();req.name='target_bottle';req.reference_frame='world'
         result=self.wait(self.entity.call_async(req))
@@ -224,11 +239,13 @@ class Demo(Node):
             raise RuntimeError('Invalid bottle pose feedback; task stopped')
         return pose
 
+    # 由瓶子姿态计算相对竖直方向的倾角（弧度）。
     def bottle(self):
         pose = self.bottle_pose(); p = pose.position; q = pose.orientation
         tilt = math.acos(max(-1, min(1, 1-2*(q.x*q.x+q.y*q.y))))
         return [p.x, p.y, p.z], tilt
 
+    # 完成一次 A 到 B 搬运，以实际抬升、落点、倾角和静置漂移判定成功。
     def run(self):
         cfg, poses = self.cfg, self.targets
         self.ready()
@@ -276,6 +293,7 @@ class Demo(Node):
 
 
 
+# 解析循环次数；两轮间实际搬回瓶子，异常时保存已有事件和失败结果。
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--output', default='work/pick_result.json')

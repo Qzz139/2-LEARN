@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<!-- EP 扩展支架模型，通过 use_rear_extension 选择后部扩展组件。 位移单位为米，角度为弧度。 -->
 
   <robot xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#xacro" name="robomaster_ep_extension">
 

@@ -1,3 +1,4 @@
+# 规划限速：旋转关节使用 rad/s、rad/s²，夹爪移动关节使用 m/s、m/s²。
 joint_limits:
   arm_1_joint:
     has_velocity_limits: true

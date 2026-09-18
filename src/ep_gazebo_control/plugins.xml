@@ -1,3 +1,4 @@
+<!-- 将 URDF 中的插件名称映射到共享库内的 PositionServo 类。 -->
 <library path="ep_position_servo">
   <class name="ep_gazebo_control/PositionServo" type="ep_gazebo_control::PositionServo"
     base_class_type="gazebo_ros2_control::GazeboSystemInterface">

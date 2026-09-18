@@ -1,3 +1,4 @@
+<!-- 模型展示入口：加载机器人描述，并按参数选择普通或 GUI 关节状态发布器。 -->
 <launch>
 
   <arg name="joint_state_gui" default="false" description="If true, select the GUI version of :ros:exec:`join_state_publisher/join_state_publisher`"/>
