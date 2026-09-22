@@ -10,6 +10,10 @@ __pycache__/
 *.db3
 .vscode/
 
+# Local transition artifacts and generated files.
+transition/output/
+transition/tmp/
+
 ._*
 config/real_pick.json.bak
 config/real_pick.json.tmp

@@ -17,6 +17,7 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 POSITION_TOLERANCE_MM = 2
 MAX_HORIZONTAL_SPAN_MM = 90  # Requested layout, not a hardware reachability limit.
+MAX_VERTICAL_SPAN_MM = 120  # Ground pick vs raised HOME; not a joint-limit proof.
 MAX_COMMAND_MM = 60
 
 
@@ -68,12 +69,12 @@ def layout(cfg):
     place = modular_delta(cfg['place_raw_sdk_mm'], anchor)
     safe = modular_delta((anchor[0], cfg['safe_y_raw_sdk_mm']), anchor)[1]
     clearance = cfg['release_clearance_mm']
-    if max(abs(home[1]), abs(place[1])) > 60 or not 5 <= safe <= 60:
-        raise ValueError('Taught layout exceeds the 60 mm vertical workspace')
+    if max(abs(home[1]), abs(place[1])) > MAX_VERTICAL_SPAN_MM or not 5 <= safe <= MAX_VERTICAL_SPAN_MM:
+        raise ValueError('Taught layout exceeds the %s mm vertical workspace' % MAX_VERTICAL_SPAN_MM)
     if max(home[0], place[0], 0) - min(home[0], place[0], 0) > MAX_HORIZONTAL_SPAN_MM:
-        raise ValueError('Horizontal span exceeds 90 mm')
-    if safe < max(home[1], place[1] + clearance, 0) or safe - min(home[1], place[1], 0) > 60:
-        raise ValueError('Safe height must be above HOME, A and the release pose, within 60 mm vertical span')
+        raise ValueError('Horizontal span exceeds %s mm' % MAX_HORIZONTAL_SPAN_MM)
+    if safe < max(home[1], place[1] + clearance, 0) or safe - min(home[1], place[1], 0) > MAX_VERTICAL_SPAN_MM:
+        raise ValueError('Safe height must be above HOME, A and the release pose, within %s mm vertical span' % MAX_VERTICAL_SPAN_MM)
     return {'home': home, 'pick': (0, 0), 'place': place, 'safe_y': safe}
 
 
@@ -226,8 +227,9 @@ class Pick:
         current = self.relative_position()
         target = (current[0] if x is None else x, current[1] if y is None else y)
         delta = (target[0] - current[0], target[1] - current[1])
-        if abs(delta[0]) > MAX_HORIZONTAL_SPAN_MM + self.tolerance or abs(delta[1]) > MAX_COMMAND_MM + self.tolerance or (delta[0] and delta[1]):
-            raise RuntimeError('Unsafe leg: require one axis, horizontal <=90 mm, vertical <=60 mm')
+        if (delta[0] and delta[1]) or abs(delta[0]) > MAX_HORIZONTAL_SPAN_MM + self.tolerance or abs(delta[1]) > MAX_VERTICAL_SPAN_MM + self.tolerance:
+            raise RuntimeError('Unsafe leg: require one axis, horizontal <=%s mm, vertical <=%s mm' % (
+                MAX_HORIZONTAL_SPAN_MM, MAX_VERTICAL_SPAN_MM))
         if max(abs(v) for v in delta) <= self.tolerance:
             self.record(stage + '_already_at_target', target_mm=target, error_mm=delta)
             return
@@ -241,6 +243,10 @@ class Pick:
             # Restore the configured safe height first; failure aborts segment 2.
             self.goto(stage + '_restore_height', y=safe)
             self.goto(stage + '_segment_2', x=target[0])
+        elif abs(delta[1]) > MAX_COMMAND_MM + self.tolerance:
+            step = MAX_COMMAND_MM if delta[1] > 0 else -MAX_COMMAND_MM
+            self.goto(stage + '_segment_1', y=current[1] + step)
+            self.goto(stage + '_segment_2', y=target[1])
         else:
             # Cap boundary corrections but retain the taught endpoint check.
             command = tuple(max(-MAX_COMMAND_MM, min(MAX_COMMAND_MM, v)) for v in delta)

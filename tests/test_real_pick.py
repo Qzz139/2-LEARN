@@ -173,6 +173,35 @@ class RealPickTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pick.layout(cfg)
 
+    def test_layout_allows_raised_home_above_ground_pick(self):
+        cfg = taught_config()
+        cfg.update(home_raw_sdk_mm=[159, 82], pick_raw_sdk_mm=[159, 4294967293],
+                   place_raw_sdk_mm=[189, 4294967293], safe_y_raw_sdk_mm=82)
+        points = pick.layout(cfg)
+        self.assertEqual(points['home'][1], 85)
+        self.assertEqual(points['safe_y'], 85)
+
+    def test_layout_beyond_vertical_span_rejected(self):
+        cfg = taught_config()
+        cfg.update(home_raw_sdk_mm=[159, 150], pick_raw_sdk_mm=[159, 4294967293],
+                   place_raw_sdk_mm=[189, 4294967293], safe_y_raw_sdk_mm=150)
+        with self.assertRaisesRegex(ValueError, 'vertical workspace'):
+            pick.layout(cfg)
+
+    def test_vertical_lift_over_60_mm_is_segmented(self):
+        cfg = taught_config()
+        cfg.update(home_raw_sdk_mm=[159, 82], pick_raw_sdk_mm=[159, 4294967293],
+                   place_raw_sdk_mm=[189, 4294967293], safe_y_raw_sdk_mm=82)
+        task = pick.Pick(SimpleNamespace(), cfg, lambda *args, **kw: None)
+        task.feedback((159, 4294967293))
+        calls = []
+        def move(stage, x, y):
+            calls.append((stage, x, y))
+            task.feedback((task.position[0] + x, (task.position[1] + y) % 2**32))
+        task.move = move
+        task.goto('lift', y=85)
+        self.assertEqual(calls, [('lift_segment_1', 0, 60), ('lift_segment_2', 0, 25)])
+
     def test_returned_home_can_start_next_manually_reset_trial(self):
         calls, stages, task, error = self.exercise(start=(139, 17))
         self.assertIsNone(error)
